@@ -40,3 +40,37 @@ TEST(RouterTest, DynamicRouteParameters) {
     router.route(req1, res1);
     EXPECT_EQ(res1.status_code, http::HttpStatus::OK);
 }
+
+TEST(RouterTest, MiddlewareExecution) {
+    routing::Router router;
+    
+    // Middleware that blocks requests
+    router.use([](http::HttpRequest& req, http::HttpResponse& res) {
+        if (req.headers["Authorization"] != "Bearer token") {
+            res.status_code = http::HttpStatus::Forbidden;
+            return false; // Stop pipeline
+        }
+        return true; // Continue
+    });
+
+    router.add_route(http::HttpMethod::GET, "/protected", [](const http::HttpRequest&, http::HttpResponse& res) {
+        res.status_code = http::HttpStatus::OK;
+    });
+
+    // Request without auth
+    http::HttpRequest req1;
+    req1.method = http::HttpMethod::GET;
+    req1.uri = "/protected";
+    http::HttpResponse res1;
+    router.route(req1, res1);
+    EXPECT_EQ(res1.status_code, http::HttpStatus::Forbidden);
+
+    // Request with auth
+    http::HttpRequest req2;
+    req2.method = http::HttpMethod::GET;
+    req2.uri = "/protected";
+    req2.headers["Authorization"] = "Bearer token";
+    http::HttpResponse res2;
+    router.route(req2, res2);
+    EXPECT_EQ(res2.status_code, http::HttpStatus::OK);
+}

@@ -17,6 +17,9 @@ public:
     App(const App&) = delete;
     App& operator=(const App&) = delete;
 
+    // Middleware
+    App& use(routing::Middleware m);
+
     // Fluent routing API
     App& get(const std::string& path, routing::RouteHandler handler);
     App& post(const std::string& path, routing::RouteHandler handler);

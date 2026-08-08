@@ -11,6 +11,11 @@ App::~App() {
     stop();
 }
 
+App& App::use(routing::Middleware m) {
+    router_.use(std::move(m));
+    return *this;
+}
+
 App& App::get(const std::string& path, routing::RouteHandler handler) {
     router_.add_route(http::HttpMethod::GET, path, std::move(handler));
     return *this;

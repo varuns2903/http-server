@@ -23,6 +23,12 @@ int main(int argc, char* argv[]) {
         std::signal(SIGINT, handle_signal);
         std::signal(SIGTERM, handle_signal);
 
+        // Global Middleware (Logging)
+        app.use([](http::HttpRequest& req, http::HttpResponse& /*res*/) {
+            LOG_INFO("[Middleware] Received " << req.uri);
+            return true;
+        });
+
         // Fluent routing
         app.get("/", [](const http::HttpRequest& req, http::HttpResponse& res) {
             res.html("<h1>Welcome to the C++ Web Framework!</h1>");

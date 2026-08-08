@@ -46,7 +46,18 @@ void Router::set_static_dir(const std::string& dir) {
     static_dir_ = dir;
 }
 
+void Router::use(Middleware m) {
+    middlewares_.push_back(std::move(m));
+}
+
 void Router::route(http::HttpRequest& request, http::HttpResponse& response) const {
+    // 0. Execute Middlewares
+    for (const auto& m : middlewares_) {
+        if (!m(request, response)) {
+            return; // Middleware intercepted and handled the request
+        }
+    }
+
     std::string key = make_route_key(request.method, request.uri);
     
     // 1. Check exact match
