@@ -30,6 +30,10 @@ int main(int argc, char* argv[]) {
         .get("/api/data", [](const http::HttpRequest& req, http::HttpResponse& res) {
             res.json(R"({"status": "success", "message": "epoll is fast!"})");
         })
+        .get("/users/:id", [](const http::HttpRequest& req, http::HttpResponse& res) {
+            std::string user_id = req.params.at("id");
+            res.json("{\"user_id\": \"" + user_id + "\", \"name\": \"John Doe\"}");
+        })
         .static_dir(config.static_dir);
 
         app.listen();

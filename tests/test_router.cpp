@@ -23,3 +23,20 @@ TEST(RouterTest, RouteMatchAndNotFound) {
     router.route(req2, res2);
     EXPECT_EQ(res2.status_code, http::HttpStatus::NotFound);
 }
+
+TEST(RouterTest, DynamicRouteParameters) {
+    routing::Router router;
+    router.add_route(http::HttpMethod::GET, "/users/:id", [](const http::HttpRequest& req, http::HttpResponse& res) {
+        res.status_code = http::HttpStatus::OK;
+        // Verify params are extracted
+        EXPECT_EQ(req.params.at("id"), "42");
+    });
+
+    http::HttpRequest req1;
+    req1.method = http::HttpMethod::GET;
+    req1.uri = "/users/42";
+    
+    http::HttpResponse res1;
+    router.route(req1, res1);
+    EXPECT_EQ(res1.status_code, http::HttpStatus::OK);
+}

@@ -3,11 +3,18 @@
 #include "../http/HttpResponse.hpp"
 #include <functional>
 #include <unordered_map>
+#include <vector>
 #include <string>
 
 namespace routing {
 
 using RouteHandler = std::function<void(const http::HttpRequest&, http::HttpResponse&)>;
+
+struct DynamicRoute {
+    http::HttpMethod method;
+    std::vector<std::string> path_segments;
+    RouteHandler handler;
+};
 
 class Router {
 public:
@@ -16,11 +23,14 @@ public:
     void set_static_dir(const std::string& dir);
 
     // Route an incoming request to the correct handler
-    void route(const http::HttpRequest& request, http::HttpResponse& response) const;
+    void route(http::HttpRequest& request, http::HttpResponse& response) const;
 
 private:
     std::string make_route_key(http::HttpMethod method, std::string_view path) const;
+    std::vector<std::string> split_path(std::string_view path) const;
+    
     std::unordered_map<std::string, RouteHandler> routes_;
+    std::vector<DynamicRoute> dynamic_routes_;
     std::string static_dir_;
 };
 
