@@ -72,7 +72,8 @@ void Connection::process_request() {
     auto parsed_req = http::HttpParser::parse(raw_request);
     
     if (parsed_req) {
-        http::HttpResponse response = router_.route(*parsed_req);
+        http::HttpResponse response;
+        router_.route(*parsed_req, response);
         
         bool keep_alive = true;
         auto it = parsed_req->headers.find("Connection");

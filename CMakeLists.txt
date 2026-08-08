@@ -33,6 +33,7 @@ add_library(server_core STATIC
     src/http/HttpParser.cpp
     src/http/HttpResponse.cpp
     src/routing/Router.cpp
+    src/server/App.cpp
 )
 
 # Core executable

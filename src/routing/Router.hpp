@@ -7,7 +7,7 @@
 
 namespace routing {
 
-using RouteHandler = std::function<http::HttpResponse(const http::HttpRequest&)>;
+using RouteHandler = std::function<void(const http::HttpRequest&, http::HttpResponse&)>;
 
 class Router {
 public:
@@ -16,7 +16,7 @@ public:
     void set_static_dir(const std::string& dir);
 
     // Route an incoming request to the correct handler
-    http::HttpResponse route(const http::HttpRequest& request) const;
+    void route(const http::HttpRequest& request, http::HttpResponse& response) const;
 
 private:
     std::string make_route_key(http::HttpMethod method, std::string_view path) const;

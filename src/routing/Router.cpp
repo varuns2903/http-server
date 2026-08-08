@@ -24,13 +24,14 @@ void Router::set_static_dir(const std::string& dir) {
     static_dir_ = dir;
 }
 
-http::HttpResponse Router::route(const http::HttpRequest& request) const {
+void Router::route(const http::HttpRequest& request, http::HttpResponse& response) const {
     std::string key = make_route_key(request.method, request.uri);
     
     auto it = routes_.find(key);
     if (it != routes_.end()) {
         // We found a matching route, execute the handler!
-        return it->second(request);
+        it->second(request, response);
+        return;
     }
     
     // Fallback: Check if it's a request for a static file
@@ -52,7 +53,6 @@ http::HttpResponse Router::route(const http::HttpRequest& request) const {
             
             if (req_str.find(base_str) == 0) {
                 if (fs::is_regular_file(requested_path)) {
-                    http::HttpResponse res;
                     std::string ext = requested_path.extension().string();
                     std::string mime = "application/octet-stream";
                     if (ext == ".html") mime = "text/html";
@@ -63,15 +63,13 @@ http::HttpResponse Router::route(const http::HttpRequest& request) const {
                     else if (ext == ".jpg" || ext == ".jpeg") mime = "image/jpeg";
                     else if (ext == ".txt") mime = "text/plain";
                     
-                    res.send_file(req_str, mime);
-                    return res;
+                    response.send_file(req_str, mime);
+                    return;
                 }
             } else {
                 LOG_WARN("Path traversal attack blocked! Attempted to access: " << request.uri);
-                http::HttpResponse res;
-                res.status_code = http::HttpStatus::Forbidden;
-                res.set_body("403 Forbidden");
-                return res;
+                response.status(http::HttpStatus::Forbidden).send("403 Forbidden");
+                return;
             }
         } catch (const std::exception& e) {
             // File not found or filesystem error, fall through to 404
@@ -79,10 +77,7 @@ http::HttpResponse Router::route(const http::HttpRequest& request) const {
     }
     
     // If no route matches, return a 404 Not Found
-    http::HttpResponse not_found;
-    not_found.status_code = http::HttpStatus::NotFound;
-    not_found.set_body("404 Not Found");
-    return not_found;
+    response.status(http::HttpStatus::NotFound).send("404 Not Found");
 }
 
 } // namespace routing

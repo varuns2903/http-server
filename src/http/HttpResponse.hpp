@@ -37,6 +37,15 @@ public:
 
     void set_body(const std::string& b, const std::string& content_type = "text/plain");
     
+    // Ergonomic fluent helpers
+    HttpResponse& status(HttpStatus code) {
+        status_code = code;
+        return *this;
+    }
+    void send(const std::string& b) { set_body(b, "text/plain"); }
+    void json(const std::string& j) { set_body(j, "application/json"); }
+    void html(const std::string& h) { set_body(h, "text/html"); }
+    
     // Opens the file and sets up headers for sendfile()
     void send_file(const std::string& path, const std::string& content_type);
 
