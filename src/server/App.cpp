@@ -26,11 +26,6 @@ App& App::post(const std::string& path, routing::RouteHandler handler) {
     return *this;
 }
 
-App& App::static_dir(const std::string& dir) {
-    router_.set_static_dir(dir);
-    return *this;
-}
-
 void App::listen() {
     listener_ = std::make_unique<Listener>(config_.port);
     listener_->start();

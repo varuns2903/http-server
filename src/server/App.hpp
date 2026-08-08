@@ -23,9 +23,6 @@ public:
     // Fluent routing API
     App& get(const std::string& path, routing::RouteHandler handler);
     App& post(const std::string& path, routing::RouteHandler handler);
-    
-    // Serve static files from a directory
-    App& static_dir(const std::string& dir);
 
     // Start the server (blocking)
     void listen();

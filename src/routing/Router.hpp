@@ -21,7 +21,6 @@ class Router {
 public:
     // Register a handler for a specific HTTP method and path
     void add_route(http::HttpMethod method, const std::string& path, RouteHandler handler);
-    void set_static_dir(const std::string& dir);
     void use(Middleware m);
 
     // Route an incoming request to the correct handler
@@ -34,7 +33,6 @@ private:
     std::unordered_map<std::string, RouteHandler> routes_;
     std::vector<DynamicRoute> dynamic_routes_;
     std::vector<Middleware> middlewares_;
-    std::string static_dir_;
 };
 
 } // namespace routing

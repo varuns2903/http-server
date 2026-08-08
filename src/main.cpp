@@ -1,4 +1,5 @@
 #include "server/App.hpp"
+#include "middleware/StaticFiles.hpp"
 #include "config/Config.hpp"
 #include "utils/Logger.hpp"
 #include <iostream>
@@ -29,6 +30,9 @@ int main(int argc, char* argv[]) {
             return true;
         });
 
+        // Static File Server Middleware
+        app.use(middleware::static_files(config.static_dir));
+
         // Fluent routing
         app.get("/", [](const http::HttpRequest& req, http::HttpResponse& res) {
             res.html("<h1>Welcome to the C++ Web Framework!</h1>");
@@ -52,8 +56,7 @@ int main(int argc, char* argv[]) {
             auto j = req.json();
             j["received"] = true;
             res.json(j);
-        })
-        .static_dir(config.static_dir);
+        });
 
         app.listen();
         
