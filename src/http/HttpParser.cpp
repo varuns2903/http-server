@@ -25,15 +25,36 @@ std::optional<HttpRequest> HttpParser::parse(std::string_view raw_request) {
     std::string_view request_line = raw_request.substr(0, request_line_end);
     
     // Parse Request Line: METHOD URI VERSION
-    size_t method_end = request_line.find(' ');
-    if (method_end == std::string_view::npos) return std::nullopt;
-    request.method = parse_method(request_line.substr(0, method_end));
+    size_t space1 = request_line.find(' ');
+    size_t space2 = request_line.find(' ', space1 + 1);
     
-    size_t uri_end = request_line.find(' ', method_end + 1);
-    if (uri_end == std::string_view::npos) return std::nullopt;
-    request.uri = request_line.substr(method_end + 1, uri_end - method_end - 1);
-    
-    request.version = request_line.substr(uri_end + 1);
+    if (space1 != std::string_view::npos && space2 != std::string_view::npos && space1 != space2) {
+        request.method = parse_method(request_line.substr(0, space1));
+        std::string full_uri = std::string(request_line.substr(space1 + 1, space2 - space1 - 1));
+        
+        auto q_mark = full_uri.find('?');
+        if (q_mark != std::string::npos) {
+            request.uri = full_uri.substr(0, q_mark);
+            std::string query_string = full_uri.substr(q_mark + 1);
+            
+            std::istringstream q_stream(query_string);
+            std::string kv;
+            while (std::getline(q_stream, kv, '&')) {
+                auto eq_pos = kv.find('=');
+                if (eq_pos != std::string::npos) {
+                    request.query[kv.substr(0, eq_pos)] = kv.substr(eq_pos + 1);
+                } else {
+                    request.query[kv] = ""; // Key with no value
+                }
+            }
+        } else {
+            request.uri = full_uri;
+        }
+
+        request.http_version = std::string(request_line.substr(space2 + 1));
+    } else {
+        return std::nullopt;
+    }
     
     // Parse Headers
     size_t headers_start = request_line_end + 2;

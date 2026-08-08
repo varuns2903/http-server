@@ -51,74 +51,64 @@ void Router::use(Middleware m) {
 }
 
 void Router::route(http::HttpRequest& request, http::HttpResponse& response) const {
-    // 0. Execute Middlewares
-    for (const auto& m : middlewares_) {
-        if (!m(request, response)) {
-            return; // Middleware intercepted and handled the request
-        }
-    }
-
-    std::string key = make_route_key(request.method, request.uri);
-    
-    // 1. Check exact match
-    auto it = routes_.find(key);
-    if (it != routes_.end()) {
-        it->second(request, response);
-        return;
-    }
-    
-    // 2. Check dynamic routes
-    auto req_segments = split_path(request.uri);
-    for (const auto& dr : dynamic_routes_) {
-        if (dr.method != request.method) continue;
-        
-        bool matches = true;
-        std::unordered_map<std::string, std::string> extracted_params;
-        
-        if (req_segments.size() != dr.path_segments.size() && dr.path_segments.empty()) {
-             // Handle root vs non-root empty cases
-             if (!req_segments.empty()) matches = false;
-        } else if (req_segments.size() != dr.path_segments.size()) {
-            // Wait, we need to check if there is a wildcard that allows different sizes.
-            // For now, strict size match except for wildcards at the end.
-            if (dr.path_segments.empty() || dr.path_segments.back() != "*") {
-                matches = false;
-            }
-        }
-
-        if (matches) {
-            for (size_t i = 0; i < dr.path_segments.size(); ++i) {
-                const auto& seg_pattern = dr.path_segments[i];
-                if (seg_pattern == "*") {
-                    break; // Wildcard matches everything after
-                }
-                
-                if (i >= req_segments.size()) {
-                    matches = false;
-                    break;
-                }
-                
-                const auto& req_seg = req_segments[i];
-                if (seg_pattern[0] == ':') {
-                    // Extract variable
-                    std::string param_name = seg_pattern.substr(1);
-                    extracted_params[param_name] = req_seg;
-                } else if (seg_pattern != req_seg) {
-                    matches = false;
-                    break;
-                }
+    try {
+        // 1. Run global and route-specific middlewares
+        for (auto& mw : middlewares_) {
+            if (!mw(request, response)) {
+                return; // Pipeline stopped by middleware (e.g., auth failed, file served)
             }
         }
         
-        if (matches) {
-            request.params = std::move(extracted_params);
-            dr.handler(request, response);
+        std::string route_key = make_route_key(request.method, request.uri);
+        
+        // 2. Exact match check
+        auto it = routes_.find(route_key);
+        if (it != routes_.end()) {
+            it->second(request, response);
             return;
         }
+        
+        // 3. Dynamic match check (e.g. /users/:id)
+        auto req_segments = split_path(request.uri);
+        for (const auto& dr : dynamic_routes_) {
+            if (dr.method != request.method) continue;
+            
+            std::unordered_map<std::string, std::string> extracted_params;
+            bool matches = true;
+            
+            if (req_segments.size() != dr.path_segments.size()) continue;
+            
+            for (size_t i = 0; i < dr.path_segments.size(); ++i) {
+                if (dr.path_segments[i][0] == ':') {
+                    // It's a parameter! Extract it.
+                    std::string param_name = dr.path_segments[i].substr(1);
+                    extracted_params[param_name] = req_segments[i];
+                } else if (dr.path_segments[i] != req_segments[i]) {
+                    // Static segment mismatch
+                    matches = false;
+                    break;
+                }
+            }
+            
+            if (matches) {
+                request.params = std::move(extracted_params);
+                dr.handler(request, response);
+                return;
+            }
+        }
+        
+        // 4. If no route matches, return a 404 Not Found
+        response.status(http::HttpStatus::NotFound).send("404 Not Found");
+        
+    } catch (const std::exception& e) {
+        LOG_ERROR("Unhandled exception in route " << request.uri << ": " << e.what());
+        response.status(http::HttpStatus::InternalServerError).send(
+            "500 Internal Server Error: " + std::string(e.what())
+        );
+    } catch (...) {
+        LOG_ERROR("Unknown unhandled exception in route " << request.uri);
+        response.status(http::HttpStatus::InternalServerError).send("500 Internal Server Error");
     }
-    
-    // 3. If no route matches, return a 404 Not Found
-    response.status(http::HttpStatus::NotFound).send("404 Not Found");
 }
 
 } // namespace routing

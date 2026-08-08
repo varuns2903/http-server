@@ -10,8 +10,9 @@ enum class HttpMethod { GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD, UNKNOWN };
 
 struct HttpRequest {
     HttpMethod method{HttpMethod::UNKNOWN};
-    std::string_view uri;
-    std::string_view version;
+    std::string uri;
+    std::unordered_map<std::string, std::string> query;
+    std::string http_version;
     std::unordered_map<std::string_view, std::string_view> headers;
     std::string_view body;
     std::unordered_map<std::string, std::string> params;

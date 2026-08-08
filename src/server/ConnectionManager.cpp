@@ -18,8 +18,16 @@ void ConnectionManager::add_connection(network::Socket socket) {
 void ConnectionManager::remove_connection(int fd) {
     epoll_.remove(fd);
     
-    std::lock_guard<std::mutex> lock(map_mutex_);
-    connections_.erase(fd); // Safely destructs Connection
+    std::unique_ptr<Connection> conn_to_destroy;
+    {
+        std::lock_guard<std::mutex> lock(map_mutex_);
+        auto it = connections_.find(fd);
+        if (it != connections_.end()) {
+            conn_to_destroy = std::move(it->second);
+            connections_.erase(it);
+        }
+    }
+    // conn_to_destroy goes out of scope and is safely destructed outside map_mutex_!
 }
 
 void ConnectionManager::handle_read(int fd) {

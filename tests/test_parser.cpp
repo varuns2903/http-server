@@ -15,7 +15,7 @@ TEST(HttpParserTest, ValidGetRequest) {
     ASSERT_TRUE(req.has_value());
     EXPECT_EQ(req->method, HttpMethod::GET);
     EXPECT_EQ(req->uri, "/index.html");
-    EXPECT_EQ(req->version, "HTTP/1.1");
+    EXPECT_EQ(req->http_version, "HTTP/1.1");
     EXPECT_EQ(req->headers["Host"], "localhost:8080");
     EXPECT_EQ(req->headers["User-Agent"], "curl/7.68.0");
     EXPECT_EQ(req->body, "");
