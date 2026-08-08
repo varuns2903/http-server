@@ -1,5 +1,6 @@
 #include "server/App.hpp"
 #include "middleware/StaticFiles.hpp"
+#include "middleware/Cors.hpp"
 #include "config/Config.hpp"
 #include "utils/Logger.hpp"
 #include <iostream>
@@ -29,6 +30,9 @@ int main(int argc, char* argv[]) {
             LOG_INFO("[Middleware] Received " << req.uri);
             return true;
         });
+
+        // CORS Middleware
+        app.use(middleware::cors());
 
         // Static File Server Middleware
         app.use(middleware::static_files(config.static_dir));

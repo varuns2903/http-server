@@ -35,6 +35,7 @@ add_library(server_core STATIC
     src/routing/Router.cpp
     src/server/App.cpp
     src/middleware/StaticFiles.cpp
+    src/middleware/Cors.cpp
 )
 
 add_library(HttpServer::core ALIAS server_core)
