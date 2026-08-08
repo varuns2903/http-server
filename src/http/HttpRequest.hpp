@@ -6,7 +6,7 @@
 
 namespace http {
 
-enum class HttpMethod { GET, POST, HEAD, UNKNOWN };
+enum class HttpMethod { GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD, UNKNOWN };
 
 struct HttpRequest {
     HttpMethod method{HttpMethod::UNKNOWN};

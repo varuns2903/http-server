@@ -5,6 +5,10 @@ namespace http {
 HttpMethod HttpParser::parse_method(std::string_view method_str) {
     if (method_str == "GET") return HttpMethod::GET;
     if (method_str == "POST") return HttpMethod::POST;
+    if (method_str == "PUT") return HttpMethod::PUT;
+    if (method_str == "PATCH") return HttpMethod::PATCH;
+    if (method_str == "DELETE") return HttpMethod::DELETE;
+    if (method_str == "OPTIONS") return HttpMethod::OPTIONS;
     if (method_str == "HEAD") return HttpMethod::HEAD;
     return HttpMethod::UNKNOWN;
 }

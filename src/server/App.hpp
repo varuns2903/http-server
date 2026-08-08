@@ -23,6 +23,10 @@ public:
     // Fluent routing API
     App& get(const std::string& path, routing::RouteHandler handler);
     App& post(const std::string& path, routing::RouteHandler handler);
+    App& put(const std::string& path, routing::RouteHandler handler);
+    App& patch(const std::string& path, routing::RouteHandler handler);
+    App& del(const std::string& path, routing::RouteHandler handler);
+    App& options(const std::string& path, routing::RouteHandler handler);
 
     // Start the server (blocking)
     void listen();

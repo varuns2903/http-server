@@ -10,6 +10,10 @@ std::string Router::make_route_key(http::HttpMethod method, std::string_view pat
     switch (method) {
         case http::HttpMethod::GET: method_str = "GET"; break;
         case http::HttpMethod::POST: method_str = "POST"; break;
+        case http::HttpMethod::PUT: method_str = "PUT"; break;
+        case http::HttpMethod::PATCH: method_str = "PATCH"; break;
+        case http::HttpMethod::DELETE: method_str = "DELETE"; break;
+        case http::HttpMethod::OPTIONS: method_str = "OPTIONS"; break;
         case http::HttpMethod::HEAD: method_str = "HEAD"; break;
         default: method_str = "UNKNOWN"; break;
     }

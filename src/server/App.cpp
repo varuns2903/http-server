@@ -26,6 +26,26 @@ App& App::post(const std::string& path, routing::RouteHandler handler) {
     return *this;
 }
 
+App& App::put(const std::string& path, routing::RouteHandler handler) {
+    router_.add_route(http::HttpMethod::PUT, path, std::move(handler));
+    return *this;
+}
+
+App& App::patch(const std::string& path, routing::RouteHandler handler) {
+    router_.add_route(http::HttpMethod::PATCH, path, std::move(handler));
+    return *this;
+}
+
+App& App::del(const std::string& path, routing::RouteHandler handler) {
+    router_.add_route(http::HttpMethod::DELETE, path, std::move(handler));
+    return *this;
+}
+
+App& App::options(const std::string& path, routing::RouteHandler handler) {
+    router_.add_route(http::HttpMethod::OPTIONS, path, std::move(handler));
+    return *this;
+}
+
 void App::listen() {
     listener_ = std::make_unique<Listener>(config_.port);
     listener_->start();
