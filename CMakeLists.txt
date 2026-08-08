@@ -22,6 +22,8 @@ endif()
 add_library(server_core STATIC
     src/network/Socket.cpp
     src/server/Listener.cpp
+    src/config/Config.cpp
+    src/utils/Logger.cpp
     src/server/EventLoop.cpp
     src/server/Connection.cpp
     src/server/ConnectionManager.cpp

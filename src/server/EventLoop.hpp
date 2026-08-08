@@ -5,13 +5,14 @@
 #include "ConnectionManager.hpp"
 #include "../concurrency/ThreadPool.hpp"
 #include "TimerManager.hpp"
+#include "../config/Config.hpp"
 #include <atomic>
 
 namespace server {
 
 class EventLoop {
 public:
-    EventLoop(Listener& listener, const routing::Router& router);
+    EventLoop(Listener& listener, const routing::Router& router, const config::ServerConfig& config);
     void run();
     void stop();
 

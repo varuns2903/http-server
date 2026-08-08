@@ -1,22 +1,25 @@
 #include "server/Listener.hpp"
 #include "server/EventLoop.hpp"
 #include "routing/Router.hpp"
+#include "config/Config.hpp"
+#include "utils/Logger.hpp"
 #include <iostream>
 #include <csignal>
-
-constexpr int PORT = 8080;
 
 server::EventLoop* global_loop = nullptr;
 
 void handle_signal(int signum) {
-    std::cout << "\nReceived signal " << signum << ". Initiating graceful shutdown...\n";
+    LOG_INFO("Received signal " << signum << ". Initiating graceful shutdown...");
     if (global_loop) {
         global_loop->stop();
     }
 }
 
-int main() {
+int main(int argc, char* argv[]) {
     try {
+        auto config = config::ServerConfig::parse(argc, argv);
+        utils::Logger::init(config.log_level);
+
         std::signal(SIGINT, handle_signal);
         std::signal(SIGTERM, handle_signal);
 
@@ -24,7 +27,7 @@ int main() {
         
         router.add_route(http::HttpMethod::GET, "/", [](const http::HttpRequest& /*req*/) {
             http::HttpResponse res;
-            res.set_body("<h1>Welcome to Phase 12: Graceful Shutdown!</h1>", "text/html");
+            res.set_body("<h1>Welcome to Phase 14: Config & Logging!</h1>", "text/html");
             return res;
         });
 
@@ -34,16 +37,12 @@ int main() {
             return res;
         });
 
-        router.add_route(http::HttpMethod::GET, "/test", [](const http::HttpRequest& /*req*/) {
-            http::HttpResponse res;
-            res.send_file("test.txt", "text/plain");
-            return res;
-        });
+        router.set_static_dir(config.static_dir);
 
-        server::Listener listener(PORT);
+        server::Listener listener(config.port);
         listener.start();
 
-        server::EventLoop event_loop(listener, router);
+        server::EventLoop event_loop(listener, router, config);
         global_loop = &event_loop;
         
         event_loop.run();
@@ -51,10 +50,10 @@ int main() {
         global_loop = nullptr;
 
     } catch (const std::exception& e) {
-        std::cerr << "Fatal error: " << e.what() << "\n";
+        LOG_ERROR("Fatal error: " << e.what());
         return 1;
     }
 
-    std::cout << "Server shutdown complete. Goodbye!\n";
+    LOG_INFO("Server shutdown complete. Goodbye!");
     return 0;
 }

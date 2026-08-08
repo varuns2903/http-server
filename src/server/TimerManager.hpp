@@ -4,6 +4,8 @@
 #include <vector>
 #include <queue>
 #include <unordered_map>
+#include <unordered_set>
+#include <mutex>
 #include <cstdint>
 
 namespace server {
@@ -29,15 +31,16 @@ public:
     void cancel_timer(uint64_t timer_id);
 
     // Returns how many milliseconds until the next timer expires, or -1 if empty
-    int get_next_timeout() const;
+    int get_next_timeout();
 
     // Process all expired timers
     void handle_expired_timers(std::function<void(int)> on_timeout);
 
 private:
     std::priority_queue<TimerEvent, std::vector<TimerEvent>, std::greater<TimerEvent>> timers_;
-    std::unordered_map<uint64_t, bool> active_timers_;
-    uint64_t next_timer_id_{0};
+    std::unordered_set<uint64_t> cancelled_timers_;
+    uint64_t next_timer_id_{1};
+    std::mutex mutex_;
 };
 
 } // namespace server

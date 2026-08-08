@@ -71,6 +71,7 @@ std::string HttpResponse::serialize_headers() const {
     switch (status_code) {
         case HttpStatus::OK: oss << "200 OK\r\n"; break;
         case HttpStatus::BadRequest: oss << "400 Bad Request\r\n"; break;
+        case HttpStatus::Forbidden: oss << "403 Forbidden\r\n"; break;
         case HttpStatus::NotFound: oss << "404 Not Found\r\n"; break;
         case HttpStatus::InternalServerError: oss << "500 Internal Server Error\r\n"; break;
     }

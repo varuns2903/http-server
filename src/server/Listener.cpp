@@ -5,7 +5,9 @@
 #include <stdexcept>
 #include <cerrno>
 #include <cstring>
+#include <unistd.h>
 #include <iostream>
+#include "../utils/Logger.hpp"
 
 namespace server {
 
@@ -34,7 +36,7 @@ void Listener::start() {
         throw std::runtime_error(std::string("listen failed: ") + std::strerror(errno));
     }
 
-    std::cout << "Listening on port " << port_ << "...\n";
+    LOG_INFO("Listening on port " << port_ << "...");
 }
 
 std::optional<network::Socket> Listener::accept_connection() {
@@ -50,8 +52,8 @@ std::optional<network::Socket> Listener::accept_connection() {
         throw std::runtime_error(std::string("accept failed: ") + std::strerror(errno));
     }
 
-    std::cout << "Accepted connection from " << inet_ntoa(client_addr.sin_addr) 
-              << ":" << ntohs(client_addr.sin_port) << "\n";
+    LOG_DEBUG("Accepted connection from " << inet_ntoa(client_addr.sin_addr) 
+              << ":" << ntohs(client_addr.sin_port));
 
     return network::Socket(client_fd);
 }

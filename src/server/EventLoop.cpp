@@ -1,10 +1,11 @@
 #include "EventLoop.hpp"
+#include "../utils/Logger.hpp"
 #include <iostream>
 
 namespace server {
 
-EventLoop::EventLoop(Listener& listener, const routing::Router& router)
-    : listener_(listener), thread_pool_(4), connection_manager_(epoll_, router, thread_pool_, timer_manager_) {
+EventLoop::EventLoop(Listener& listener, const routing::Router& router, const config::ServerConfig& config)
+    : listener_(listener), thread_pool_(config.worker_threads), connection_manager_(epoll_, router, thread_pool_, timer_manager_) {
     
     // Tell epoll to watch the listener socket for incoming connections (EPOLLIN)
     epoll_.add(listener_.fd(), EPOLLIN);
@@ -13,7 +14,7 @@ EventLoop::EventLoop(Listener& listener, const routing::Router& router)
 void EventLoop::run() {
     std::vector<epoll_event> events(64);
 
-    std::cout << "Event loop started with ConnectionManager (HTTP Keep-Alive enabled)!\n";
+    LOG_INFO("Event loop started with ConnectionManager (HTTP Keep-Alive enabled)!");
 
     while (is_running_) {
         int timeout = timer_manager_.get_next_timeout();
@@ -43,7 +44,7 @@ void EventLoop::run() {
         });
     }
     
-    std::cout << "Event loop stopped. Shutting down...\n";
+    LOG_INFO("Event loop stopped. Shutting down...");
 }
 
 void EventLoop::stop() {

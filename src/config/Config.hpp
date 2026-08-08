@@ -1,0 +1,16 @@
+#pragma once
+#include <string>
+#include <cstdint>
+
+namespace config {
+
+struct ServerConfig {
+    uint16_t port{8080};
+    size_t worker_threads{4};
+    std::string log_level{"INFO"};
+    std::string static_dir{"./public"};
+    
+    static ServerConfig parse(int argc, char* argv[]);
+};
+
+} // namespace config
