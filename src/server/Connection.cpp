@@ -87,22 +87,7 @@ void Connection::process_request() {
             response.headers["Connection"] = "keep-alive";
         }
         
-        bool is_file = (response.file_fd != -1);
-        
-        if (is_file) {
-            std::string headers = response.serialize_headers();
-            send_data(headers);
-            
-            // Steal the FD from response so the destructor doesn't close it!
-            this->file_fd_ = response.file_fd;
-            this->file_size_ = response.file_size;
-            this->file_offset_ = 0;
-            response.file_fd = -1; 
-        } else {
-            std::string serialized = response.serialize();
-            send_data(serialized);
-        }
-
+        // 1. Calculate how many bytes to consume from read_buffer_
         size_t headers_end = raw_request.find("\r\n\r\n");
         size_t consumed_bytes = headers_end + 4;
         
@@ -111,11 +96,30 @@ void Connection::process_request() {
             consumed_bytes += std::stoull(std::string(cl_it->second));
         }
         
+        // 2. Erase the request from read_buffer_ BEFORE sending data!
+        // This prevents a Use-After-Free race condition if the client disconnects immediately.
         if (consumed_bytes <= read_buffer_.size()) {
             read_buffer_.erase(read_buffer_.begin(), read_buffer_.begin() + static_cast<std::ptrdiff_t>(consumed_bytes));
         } else {
             read_buffer_.clear(); 
         }
+        
+        // 3. Setup file state BEFORE sending headers!
+        bool is_file = (response.file_fd != -1);
+        std::string serialized_data;
+        
+        if (is_file) {
+            serialized_data = response.serialize_headers();
+            this->file_fd_ = response.file_fd;
+            this->file_size_ = response.file_size;
+            this->file_offset_ = 0;
+            response.file_fd = -1; // Steal the FD
+        } else {
+            serialized_data = response.serialize();
+        }
+
+        // 4. FINALLY, send data! This might yield to EventLoop! Do not touch `this` after this line!
+        send_data(serialized_data);
     } else {
         http::HttpResponse err_res;
         err_res.status_code = http::HttpStatus::BadRequest;
@@ -123,6 +127,7 @@ void Connection::process_request() {
         err_res.headers["Connection"] = "close";
         should_close_ = true;
         
+        read_buffer_.clear(); // Clear bad request before sending
         std::string serialized = err_res.serialize();
         send_data(serialized);
     }
