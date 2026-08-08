@@ -65,9 +65,9 @@ install(EXPORT HttpServerTargets
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/HttpServer
 )
 
-# Core executable
-add_executable(http_server src/main.cpp)
-target_link_libraries(http_server PRIVATE server_core)
+# Examples
+add_executable(basic_server examples/basic_server.cpp)
+target_link_libraries(basic_server PRIVATE server_core)
 
 # Testing Setup (GoogleTest via FetchContent)
 include(FetchContent)
