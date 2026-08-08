@@ -13,7 +13,7 @@ class ConnectionManager; // Forward declaration
 
 class Connection {
 public:
-    Connection(network::Socket socket, network::Epoll& epoll, const routing::Router& router, ConnectionManager& manager, concurrency::ThreadPool& thread_pool, TimerManager& timer_manager);
+    Connection(network::Socket socket, network::Epoll& epoll, const routing::Router& router, ConnectionManager& manager, concurrency::ThreadPool& thread_pool, TimerManager& timer_manager, size_t max_body_size);
     ~Connection();
 
     Connection(const Connection&) = delete;
@@ -41,10 +41,11 @@ private:
     bool should_close_{false};
     uint64_t current_timer_id_{0};
     
-    // For zero-copy sendfile
     int file_fd_{-1};
     off_t file_size_{0};
     off_t file_offset_{0};
+    
+    size_t max_body_size_;
 };
 
 } // namespace server

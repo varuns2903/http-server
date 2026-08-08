@@ -7,8 +7,8 @@
 
 namespace server {
 
-Connection::Connection(network::Socket socket, network::Epoll& epoll, const routing::Router& router, ConnectionManager& manager, concurrency::ThreadPool& thread_pool, TimerManager& timer_manager)
-    : socket_(std::move(socket)), epoll_(epoll), router_(router), manager_(manager), thread_pool_(thread_pool), timer_manager_(timer_manager) {
+Connection::Connection(network::Socket socket, network::Epoll& epoll, const routing::Router& router, ConnectionManager& manager, concurrency::ThreadPool& thread_pool, TimerManager& timer_manager, size_t max_body_size)
+    : socket_(std::move(socket)), epoll_(epoll), router_(router), manager_(manager), thread_pool_(thread_pool), timer_manager_(timer_manager), max_body_size_(max_body_size) {
     reset_timer(); // Start the 10-second idle timeout
 }
 
@@ -51,6 +51,13 @@ void Connection::handle_read() {
         } else {
             // Append newly read bytes to our persistent buffer
             read_buffer_.insert(read_buffer_.end(), buffer, buffer + bytes_read);
+            
+            // Limit check to prevent memory exhaustion (DDoS protection)
+            if (read_buffer_.size() > max_body_size_) {
+                std::cerr << "WARN: Connection " << socket_.fd() << " exceeded max_body_size (" << max_body_size_ << "). Dropping." << std::endl;
+                manager_.remove_connection(socket_.fd());
+                return;
+            }
         }
     }
 

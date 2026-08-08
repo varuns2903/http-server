@@ -22,8 +22,13 @@ int main(int argc, char* argv[]) {
         server::App app(config);
         global_app = &app;
 
-        std::signal(SIGINT, handle_signal);
-        std::signal(SIGTERM, handle_signal);
+        struct sigaction sa;
+        sa.sa_handler = handle_signal;
+        sigemptyset(&sa.sa_mask);
+        sa.sa_flags = 0;
+        
+        sigaction(SIGINT, &sa, nullptr);
+        sigaction(SIGTERM, &sa, nullptr);
 
         // Global Middleware (Logging)
         app.use([](http::HttpRequest& req, http::HttpResponse& /*res*/) {

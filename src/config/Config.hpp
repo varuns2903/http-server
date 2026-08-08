@@ -9,6 +9,7 @@ struct ServerConfig {
     size_t worker_threads{4};
     std::string log_level{"INFO"};
     std::string static_dir{"./public"};
+    size_t max_body_size{10485760}; // Default 10 MB limit
     
     static ServerConfig parse(int argc, char* argv[]);
 };

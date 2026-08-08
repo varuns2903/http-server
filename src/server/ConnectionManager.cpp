@@ -3,8 +3,8 @@
 
 namespace server {
 
-ConnectionManager::ConnectionManager(network::Epoll& epoll, const routing::Router& router, concurrency::ThreadPool& thread_pool, TimerManager& timer_manager)
-    : epoll_(epoll), router_(router), thread_pool_(thread_pool), timer_manager_(timer_manager) {}
+ConnectionManager::ConnectionManager(network::Epoll& epoll, const routing::Router& router, concurrency::ThreadPool& thread_pool, TimerManager& timer_manager, size_t max_body_size)
+    : epoll_(epoll), router_(router), thread_pool_(thread_pool), timer_manager_(timer_manager), max_body_size_(max_body_size) {}
 
 void ConnectionManager::add_connection(network::Socket socket) {
     int fd = socket.fd();
@@ -12,7 +12,7 @@ void ConnectionManager::add_connection(network::Socket socket) {
     epoll_.add(fd, EPOLLIN | EPOLLONESHOT);
     
     std::lock_guard<std::mutex> lock(map_mutex_);
-    connections_[fd] = std::make_unique<Connection>(std::move(socket), epoll_, router_, *this, thread_pool_, timer_manager_);
+    connections_[fd] = std::make_unique<Connection>(std::move(socket), epoll_, router_, *this, thread_pool_, timer_manager_, max_body_size_);
 }
 
 void ConnectionManager::remove_connection(int fd) {

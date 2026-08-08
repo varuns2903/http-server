@@ -14,6 +14,7 @@ ServerConfig ServerConfig::parse(int argc, char* argv[]) {
         {"threads", required_argument, nullptr, 't'},
         {"log-level", required_argument, nullptr, 'l'},
         {"static-dir", required_argument, nullptr, 's'},
+        {"max-body-size", required_argument, nullptr, 'm'},
         {"help", no_argument, nullptr, 'h'},
         {nullptr, no_argument, nullptr, 0}
     };
@@ -35,6 +36,9 @@ ServerConfig ServerConfig::parse(int argc, char* argv[]) {
             case 's':
                 cfg.static_dir = optarg;
                 break;
+            case 'm':
+                cfg.max_body_size = static_cast<size_t>(std::stoull(optarg));
+                break;
             case 'h':
             case '?':
             default:
@@ -43,6 +47,7 @@ ServerConfig ServerConfig::parse(int argc, char* argv[]) {
                           << "  -t, --threads <count>       Number of worker threads (default: 4)\n"
                           << "  -l, --log-level <level>     Log level (DEBUG, INFO, WARN, ERROR) (default: INFO)\n"
                           << "  -s, --static-dir <dir>      Directory for static files (default: ./public)\n"
+                          << "  -m, --max-body-size <bytes> Maximum HTTP request body size (default: 10485760 (10MB))\n"
                           << "  -h, --help                  Show this help message\n";
                 std::exit(0);
         }
