@@ -4,6 +4,7 @@
 #include "../routing/Router.hpp"
 #include "ConnectionManager.hpp"
 #include "../concurrency/ThreadPool.hpp"
+#include "TimerManager.hpp"
 
 namespace server {
 
@@ -18,6 +19,7 @@ private:
     Listener& listener_;
     network::Epoll epoll_;
     concurrency::ThreadPool thread_pool_;
+    TimerManager timer_manager_;
     ConnectionManager connection_manager_;
 };
 

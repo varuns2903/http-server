@@ -3,6 +3,7 @@
 #include "../network/Epoll.hpp"
 #include "../routing/Router.hpp"
 #include "../concurrency/ThreadPool.hpp"
+#include "TimerManager.hpp"
 #include <vector>
 #include <string_view>
 
@@ -12,7 +13,7 @@ class ConnectionManager; // Forward declaration
 
 class Connection {
 public:
-    Connection(network::Socket socket, network::Epoll& epoll, const routing::Router& router, ConnectionManager& manager, concurrency::ThreadPool& thread_pool);
+    Connection(network::Socket socket, network::Epoll& epoll, const routing::Router& router, ConnectionManager& manager, concurrency::ThreadPool& thread_pool, TimerManager& timer_manager);
     ~Connection();
 
     Connection(const Connection&) = delete;
@@ -24,23 +25,21 @@ public:
 private:
     void process_request();
     void send_data(std::string_view data);
+    void reset_timer();
 
     network::Socket socket_;
     network::Epoll& epoll_;
     const routing::Router& router_;
     ConnectionManager& manager_;
     concurrency::ThreadPool& thread_pool_;
+    TimerManager& timer_manager_;
     
-    // Persistent buffer for partial network reads
     std::vector<char> read_buffer_;
-    // Persistent buffer for outbound responses
     std::vector<char> write_buffer_;
 
-    // Helper to check if the buffer contains a full HTTP request
     bool is_request_complete() const;
-    
-    // Flag to track if the connection should be closed after writing finishes
     bool should_close_{false};
+    uint64_t current_timer_id_{0};
 };
 
 } // namespace server

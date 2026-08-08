@@ -25,6 +25,7 @@ add_library(server_core STATIC
     src/server/EventLoop.cpp
     src/server/Connection.cpp
     src/server/ConnectionManager.cpp
+    src/server/TimerManager.cpp
     src/network/Epoll.cpp
     src/concurrency/ThreadPool.cpp
     src/http/HttpParser.cpp

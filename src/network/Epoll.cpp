@@ -44,11 +44,14 @@ void Epoll::remove(int fd) {
 }
 
 int Epoll::wait(std::vector<epoll_event>& events, int timeout_ms) {
-    int num_events = epoll_wait(epoll_fd_, events.data(), static_cast<int>(events.size()), timeout_ms);
-    if (num_events == -1 && errno != EINTR) {
+    int num_ready = epoll_wait(epoll_fd_, events.data(), static_cast<int>(events.size()), timeout_ms);
+    if (num_ready == -1) {
+        if (errno == EINTR) {
+            return 0;
+        }
         throw std::runtime_error(std::string("epoll_wait failed: ") + std::strerror(errno));
     }
-    return num_events;
+    return num_ready;
 }
 
 } // namespace network

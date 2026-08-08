@@ -4,7 +4,7 @@
 namespace server {
 
 EventLoop::EventLoop(Listener& listener, const routing::Router& router)
-    : listener_(listener), thread_pool_(4), connection_manager_(epoll_, router, thread_pool_) {
+    : listener_(listener), thread_pool_(4), connection_manager_(epoll_, router, thread_pool_, timer_manager_) {
     
     // Tell epoll to watch the listener socket for incoming connections (EPOLLIN)
     epoll_.add(listener_.fd(), EPOLLIN);
@@ -16,8 +16,8 @@ void EventLoop::run() {
     std::cout << "Event loop started with ConnectionManager (HTTP Keep-Alive enabled)!\n";
 
     while (true) {
-        // The thread SLEEPS here until the OS wakes it up. No more busy waiting!
-        int num_ready = epoll_.wait(events);
+        int timeout = timer_manager_.get_next_timeout();
+        int num_ready = epoll_.wait(events, timeout);
 
         for (size_t i = 0; i < static_cast<size_t>(num_ready); ++i) {
             int fd = events[i].data.fd;
@@ -36,6 +36,11 @@ void EventLoop::run() {
                 }
             }
         }
+
+        // Process any connections that have timed out
+        timer_manager_.handle_expired_timers([this](int fd) {
+            connection_manager_.remove_connection(fd);
+        });
     }
 }
 

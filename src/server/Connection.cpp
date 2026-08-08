@@ -6,15 +6,29 @@
 
 namespace server {
 
-Connection::Connection(network::Socket socket, network::Epoll& epoll, const routing::Router& router, ConnectionManager& manager, concurrency::ThreadPool& thread_pool)
-    : socket_(std::move(socket)), epoll_(epoll), router_(router), manager_(manager), thread_pool_(thread_pool) {
+Connection::Connection(network::Socket socket, network::Epoll& epoll, const routing::Router& router, ConnectionManager& manager, concurrency::ThreadPool& thread_pool, TimerManager& timer_manager)
+    : socket_(std::move(socket)), epoll_(epoll), router_(router), manager_(manager), thread_pool_(thread_pool), timer_manager_(timer_manager) {
+    reset_timer(); // Start the 10-second idle timeout
 }
 
 Connection::~Connection() {
+    if (current_timer_id_ != 0) {
+        timer_manager_.cancel_timer(current_timer_id_);
+    }
     // The RAII network::Socket destructor will automatically close the FD when this is destroyed
 }
 
+void Connection::reset_timer() {
+    if (current_timer_id_ != 0) {
+        timer_manager_.cancel_timer(current_timer_id_);
+    }
+    // Keep-Alive timeout is 10 seconds
+    current_timer_id_ = timer_manager_.add_timer(socket_.fd(), std::chrono::seconds(10));
+}
+
 void Connection::handle_read() {
+    reset_timer(); // Client sent data, reset their timeout!
+    
     char buffer[4096];
     
     // Read from the non-blocking socket until EAGAIN
@@ -103,6 +117,8 @@ void Connection::send_data(std::string_view data) {
 }
 
 void Connection::handle_write() {
+    reset_timer(); // Writing to client, reset their timeout!
+    
     if (write_buffer_.empty()) {
         return;
     }
