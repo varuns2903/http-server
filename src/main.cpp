@@ -34,11 +34,24 @@ int main(int argc, char* argv[]) {
             res.html("<h1>Welcome to the C++ Web Framework!</h1>");
         })
         .get("/api/data", [](const http::HttpRequest& req, http::HttpResponse& res) {
-            res.json(R"({"status": "success", "message": "epoll is fast!"})");
+            nlohmann::json j = {
+                {"status", "success"},
+                {"message", "epoll is fast!"}
+            };
+            res.json(j);
         })
         .get("/users/:id", [](const http::HttpRequest& req, http::HttpResponse& res) {
             std::string user_id = req.params.at("id");
-            res.json("{\"user_id\": \"" + user_id + "\", \"name\": \"John Doe\"}");
+            nlohmann::json j = {
+                {"user_id", user_id},
+                {"name", "John Doe"}
+            };
+            res.json(j);
+        })
+        .post("/api/echo", [](const http::HttpRequest& req, http::HttpResponse& res) {
+            auto j = req.json();
+            j["received"] = true;
+            res.json(j);
         })
         .static_dir(config.static_dir);
 

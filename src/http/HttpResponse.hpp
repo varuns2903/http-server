@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <unistd.h>
 #include <sys/types.h>
+#include "json.hpp"
 
 namespace http {
 
@@ -44,6 +45,7 @@ public:
     }
     void send(const std::string& b) { set_body(b, "text/plain"); }
     void json(const std::string& j) { set_body(j, "application/json"); }
+    void json(const nlohmann::json& j) { set_body(j.dump(), "application/json"); }
     void html(const std::string& h) { set_body(h, "text/html"); }
     
     // Opens the file and sets up headers for sendfile()
