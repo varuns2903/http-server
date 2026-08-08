@@ -40,6 +40,11 @@ private:
     bool is_request_complete() const;
     bool should_close_{false};
     uint64_t current_timer_id_{0};
+    
+    // For zero-copy sendfile
+    int file_fd_{-1};
+    off_t file_size_{0};
+    off_t file_offset_{0};
 };
 
 } // namespace server

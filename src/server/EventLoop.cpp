@@ -15,7 +15,7 @@ void EventLoop::run() {
 
     std::cout << "Event loop started with ConnectionManager (HTTP Keep-Alive enabled)!\n";
 
-    while (true) {
+    while (is_running_) {
         int timeout = timer_manager_.get_next_timeout();
         int num_ready = epoll_.wait(events, timeout);
 
@@ -42,6 +42,12 @@ void EventLoop::run() {
             connection_manager_.remove_connection(fd);
         });
     }
+    
+    std::cout << "Event loop stopped. Shutting down...\n";
+}
+
+void EventLoop::stop() {
+    is_running_ = false;
 }
 
 void EventLoop::handle_new_connections() {

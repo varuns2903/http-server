@@ -5,6 +5,7 @@
 #include "ConnectionManager.hpp"
 #include "../concurrency/ThreadPool.hpp"
 #include "TimerManager.hpp"
+#include <atomic>
 
 namespace server {
 
@@ -12,6 +13,7 @@ class EventLoop {
 public:
     EventLoop(Listener& listener, const routing::Router& router);
     void run();
+    void stop();
 
 private:
     void handle_new_connections();
@@ -21,6 +23,8 @@ private:
     concurrency::ThreadPool thread_pool_;
     TimerManager timer_manager_;
     ConnectionManager connection_manager_;
+    
+    std::atomic<bool> is_running_{true};
 };
 
 } // namespace server

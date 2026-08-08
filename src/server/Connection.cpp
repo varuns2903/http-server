@@ -3,6 +3,7 @@
 #include "../http/HttpParser.hpp"
 #include <iostream>
 #include <sys/socket.h>
+#include <sys/sendfile.h>
 
 namespace server {
 
@@ -15,7 +16,10 @@ Connection::~Connection() {
     if (current_timer_id_ != 0) {
         timer_manager_.cancel_timer(current_timer_id_);
     }
-    // The RAII network::Socket destructor will automatically close the FD when this is destroyed
+    if (file_fd_ != -1) {
+        close(file_fd_);
+    }
+    // The RAII network::Socket destructor will automatically close the socket FD
 }
 
 void Connection::reset_timer() {
@@ -83,8 +87,21 @@ void Connection::process_request() {
             response.headers["Connection"] = "keep-alive";
         }
         
-        std::string serialized = response.serialize();
-        send_data(serialized);
+        bool is_file = (response.file_fd != -1);
+        
+        if (is_file) {
+            std::string headers = response.serialize_headers();
+            send_data(headers);
+            
+            // Steal the FD from response so the destructor doesn't close it!
+            this->file_fd_ = response.file_fd;
+            this->file_size_ = response.file_size;
+            this->file_offset_ = 0;
+            response.file_fd = -1; 
+        } else {
+            std::string serialized = response.serialize();
+            send_data(serialized);
+        }
 
         size_t headers_end = raw_request.find("\r\n\r\n");
         size_t consumed_bytes = headers_end + 4;
@@ -119,44 +136,64 @@ void Connection::send_data(std::string_view data) {
 void Connection::handle_write() {
     reset_timer(); // Writing to client, reset their timeout!
     
-    if (write_buffer_.empty()) {
-        return;
+    // 1. Drain the write_buffer_ (which holds headers or string bodies)
+    if (!write_buffer_.empty()) {
+        ssize_t bytes_sent = send(socket_.fd(), write_buffer_.data(), write_buffer_.size(), 0);
+        if (bytes_sent == -1) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                epoll_.modify(socket_.fd(), EPOLLIN | EPOLLOUT | EPOLLONESHOT);
+                return;
+            }
+            manager_.remove_connection(socket_.fd());
+            return;
+        }
+        write_buffer_.erase(write_buffer_.begin(), write_buffer_.begin() + static_cast<std::ptrdiff_t>(bytes_sent));
+        
+        if (!write_buffer_.empty()) {
+            epoll_.modify(socket_.fd(), EPOLLIN | EPOLLOUT | EPOLLONESHOT);
+            return; // Still have headers to send
+        }
     }
 
-    ssize_t bytes_sent = send(socket_.fd(), write_buffer_.data(), write_buffer_.size(), 0);
-
-    if (bytes_sent == -1) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            // The OS network buffer is full. Ask epoll to wake us when we can write again!
+    // 2. If we have a file to send, do it via zero-copy sendfile
+    if (file_fd_ != -1 && file_offset_ < file_size_) {
+        // file_offset_ is updated automatically by sendfile
+        ssize_t sent = sendfile(socket_.fd(), file_fd_, &file_offset_, static_cast<size_t>(file_size_ - file_offset_));
+        
+        if (sent == -1) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                epoll_.modify(socket_.fd(), EPOLLIN | EPOLLOUT | EPOLLONESHOT);
+                return;
+            }
+            manager_.remove_connection(socket_.fd());
+            return;
+        }
+        
+        if (file_offset_ < file_size_) {
+            // Still more file data to send
             epoll_.modify(socket_.fd(), EPOLLIN | EPOLLOUT | EPOLLONESHOT);
             return;
         }
+        
+        // We finished sending the entire file!
+        close(file_fd_);
+        file_fd_ = -1;
+    }
+
+    // 3. We finished writing everything!
+    if (should_close_) {
         manager_.remove_connection(socket_.fd());
-        return;
-    }
-
-    if (bytes_sent > 0) {
-        write_buffer_.erase(write_buffer_.begin(), write_buffer_.begin() + static_cast<std::ptrdiff_t>(bytes_sent));
-    }
-
-    if (write_buffer_.empty()) {
-        if (should_close_) {
-            manager_.remove_connection(socket_.fd());
-        } else {
-            // Revert to only watching for new incoming requests
-            epoll_.modify(socket_.fd(), EPOLLIN | EPOLLONESHOT);
-            
-            // Wait! If there is STILL data in the read_buffer_ from pipelining, 
-            // we should process it immediately instead of waiting for epoll!
-            if (is_request_complete()) {
-                thread_pool_.enqueue([this]() {
-                    this->process_request();
-                });
-            }
-        }
     } else {
-        // There is still data left to send, keep watching EPOLLOUT
-        epoll_.modify(socket_.fd(), EPOLLIN | EPOLLOUT | EPOLLONESHOT);
+        // Revert to only watching for new incoming requests
+        epoll_.modify(socket_.fd(), EPOLLIN | EPOLLONESHOT);
+        
+        // Wait! If there is STILL data in the read_buffer_ from pipelining, 
+        // we should process it immediately instead of waiting for epoll!
+        if (is_request_complete()) {
+            thread_pool_.enqueue([this]() {
+                this->process_request();
+            });
+        }
     }
 }
 
