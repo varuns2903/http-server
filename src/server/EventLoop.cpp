@@ -4,7 +4,7 @@
 namespace server {
 
 EventLoop::EventLoop(Listener& listener, const routing::Router& router)
-    : listener_(listener), connection_manager_(epoll_, router) {
+    : listener_(listener), thread_pool_(4), connection_manager_(epoll_, router, thread_pool_) {
     
     // Tell epoll to watch the listener socket for incoming connections (EPOLLIN)
     epoll_.add(listener_.fd(), EPOLLIN);

@@ -6,8 +6,8 @@
 
 namespace server {
 
-Connection::Connection(network::Socket socket, network::Epoll& epoll, const routing::Router& router, ConnectionManager& manager)
-    : socket_(std::move(socket)), epoll_(epoll), router_(router), manager_(manager) {
+Connection::Connection(network::Socket socket, network::Epoll& epoll, const routing::Router& router, ConnectionManager& manager, concurrency::ThreadPool& thread_pool)
+    : socket_(std::move(socket)), epoll_(epoll), router_(router), manager_(manager), thread_pool_(thread_pool) {
 }
 
 Connection::~Connection() {
@@ -38,10 +38,18 @@ void Connection::handle_read() {
 
     // Now, check if we have a full request buffered
     if (!is_request_complete()) {
-        return; // Go back to sleep in epoll, wait for more packets!
+        // We hit EAGAIN but don't have a full request. We must re-arm EPOLLONESHOT!
+        epoll_.modify(socket_.fd(), EPOLLIN | EPOLLONESHOT);
+        return; 
     }
 
-    // We have a full request! Parse it.
+    // We have a full request! Offload parsing and routing to a worker thread!
+    thread_pool_.enqueue([this]() {
+        this->process_request();
+    });
+}
+
+void Connection::process_request() {
     std::string_view raw_request(read_buffer_.data(), read_buffer_.size());
     auto parsed_req = http::HttpParser::parse(raw_request);
     
@@ -56,7 +64,7 @@ void Connection::handle_read() {
 
         if (!keep_alive) {
             response.headers["Connection"] = "close";
-            should_close_ = true; // Wait until handle_write finishes to actually close!
+            should_close_ = true; 
         } else {
             response.headers["Connection"] = "keep-alive";
         }
@@ -64,7 +72,6 @@ void Connection::handle_read() {
         std::string serialized = response.serialize();
         send_data(serialized);
 
-        // Remove ONLY the bytes belonging to this specific request from the buffer.
         size_t headers_end = raw_request.find("\r\n\r\n");
         size_t consumed_bytes = headers_end + 4;
         
@@ -76,7 +83,7 @@ void Connection::handle_read() {
         if (consumed_bytes <= read_buffer_.size()) {
             read_buffer_.erase(read_buffer_.begin(), read_buffer_.begin() + static_cast<std::ptrdiff_t>(consumed_bytes));
         } else {
-            read_buffer_.clear(); // Safety fallback
+            read_buffer_.clear(); 
         }
     } else {
         http::HttpResponse err_res;
@@ -105,7 +112,7 @@ void Connection::handle_write() {
     if (bytes_sent == -1) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
             // The OS network buffer is full. Ask epoll to wake us when we can write again!
-            epoll_.modify(socket_.fd(), EPOLLIN | EPOLLOUT);
+            epoll_.modify(socket_.fd(), EPOLLIN | EPOLLOUT | EPOLLONESHOT);
             return;
         }
         manager_.remove_connection(socket_.fd());
@@ -117,16 +124,23 @@ void Connection::handle_write() {
     }
 
     if (write_buffer_.empty()) {
-        // We finished writing everything!
         if (should_close_) {
             manager_.remove_connection(socket_.fd());
         } else {
             // Revert to only watching for new incoming requests
-            epoll_.modify(socket_.fd(), EPOLLIN);
+            epoll_.modify(socket_.fd(), EPOLLIN | EPOLLONESHOT);
+            
+            // Wait! If there is STILL data in the read_buffer_ from pipelining, 
+            // we should process it immediately instead of waiting for epoll!
+            if (is_request_complete()) {
+                thread_pool_.enqueue([this]() {
+                    this->process_request();
+                });
+            }
         }
     } else {
         // There is still data left to send, keep watching EPOLLOUT
-        epoll_.modify(socket_.fd(), EPOLLIN | EPOLLOUT);
+        epoll_.modify(socket_.fd(), EPOLLIN | EPOLLOUT | EPOLLONESHOT);
     }
 }
 

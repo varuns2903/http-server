@@ -3,32 +3,43 @@
 
 namespace server {
 
-ConnectionManager::ConnectionManager(network::Epoll& epoll, const routing::Router& router)
-    : epoll_(epoll), router_(router) {}
+ConnectionManager::ConnectionManager(network::Epoll& epoll, const routing::Router& router, concurrency::ThreadPool& thread_pool)
+    : epoll_(epoll), router_(router), thread_pool_(thread_pool) {}
 
 void ConnectionManager::add_connection(network::Socket socket) {
     int fd = socket.fd();
-    epoll_.add(fd, EPOLLIN);
-    connections_[fd] = std::make_unique<Connection>(std::move(socket), epoll_, router_, *this);
+    // EPOLLONESHOT ensures epoll only triggers once per event, preventing concurrent thread access!
+    epoll_.add(fd, EPOLLIN | EPOLLONESHOT);
+    
+    std::lock_guard<std::mutex> lock(map_mutex_);
+    connections_[fd] = std::make_unique<Connection>(std::move(socket), epoll_, router_, *this, thread_pool_);
 }
 
 void ConnectionManager::remove_connection(int fd) {
     epoll_.remove(fd);
-    connections_.erase(fd); // This safely destructs the Connection and closes the socket via RAII
+    
+    std::lock_guard<std::mutex> lock(map_mutex_);
+    connections_.erase(fd); // Safely destructs Connection
 }
 
 void ConnectionManager::handle_read(int fd) {
-    auto it = connections_.find(fd);
-    if (it != connections_.end()) {
-        it->second->handle_read();
+    Connection* conn = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(map_mutex_);
+        auto it = connections_.find(fd);
+        if (it != connections_.end()) conn = it->second.get();
     }
+    if (conn) conn->handle_read();
 }
 
 void ConnectionManager::handle_write(int fd) {
-    auto it = connections_.find(fd);
-    if (it != connections_.end()) {
-        it->second->handle_write();
+    Connection* conn = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(map_mutex_);
+        auto it = connections_.find(fd);
+        if (it != connections_.end()) conn = it->second.get();
     }
+    if (conn) conn->handle_write();
 }
 
 } // namespace server

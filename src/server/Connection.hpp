@@ -2,6 +2,9 @@
 #include "../network/Socket.hpp"
 #include "../network/Epoll.hpp"
 #include "../routing/Router.hpp"
+#include "../concurrency/ThreadPool.hpp"
+#include <vector>
+#include <string_view>
 
 namespace server {
 
@@ -9,7 +12,7 @@ class ConnectionManager; // Forward declaration
 
 class Connection {
 public:
-    Connection(network::Socket socket, network::Epoll& epoll, const routing::Router& router, ConnectionManager& manager);
+    Connection(network::Socket socket, network::Epoll& epoll, const routing::Router& router, ConnectionManager& manager, concurrency::ThreadPool& thread_pool);
     ~Connection();
 
     Connection(const Connection&) = delete;
@@ -19,12 +22,14 @@ public:
     void handle_write();
 
 private:
+    void process_request();
     void send_data(std::string_view data);
 
     network::Socket socket_;
     network::Epoll& epoll_;
     const routing::Router& router_;
     ConnectionManager& manager_;
+    concurrency::ThreadPool& thread_pool_;
     
     // Persistent buffer for partial network reads
     std::vector<char> read_buffer_;

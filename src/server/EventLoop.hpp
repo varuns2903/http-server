@@ -3,6 +3,7 @@
 #include "Listener.hpp"
 #include "../routing/Router.hpp"
 #include "ConnectionManager.hpp"
+#include "../concurrency/ThreadPool.hpp"
 
 namespace server {
 
@@ -16,6 +17,7 @@ private:
 
     Listener& listener_;
     network::Epoll epoll_;
+    concurrency::ThreadPool thread_pool_;
     ConnectionManager connection_manager_;
 };
 
