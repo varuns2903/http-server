@@ -36,6 +36,34 @@ add_library(server_core STATIC
     src/server/App.cpp
 )
 
+add_library(HttpServer::core ALIAS server_core)
+
+target_include_directories(server_core PUBLIC 
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include/http-server>
+)
+
+# Install Rules for the Framework
+include(GNUInstallDirs)
+
+install(TARGETS server_core
+    EXPORT HttpServerTargets
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/http-server
+)
+
+install(DIRECTORY src/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/http-server
+    FILES_MATCHING PATTERN "*.hpp"
+)
+
+install(EXPORT HttpServerTargets
+    FILE HttpServerTargets.cmake
+    NAMESPACE HttpServer::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/HttpServer
+)
+
 # Core executable
 add_executable(http_server src/main.cpp)
 target_link_libraries(http_server PRIVATE server_core)
