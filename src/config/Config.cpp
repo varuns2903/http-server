@@ -15,6 +15,8 @@ ServerConfig ServerConfig::parse(int argc, char* argv[]) {
         {"log-level", required_argument, nullptr, 'l'},
         {"static-dir", required_argument, nullptr, 's'},
         {"max-body-size", required_argument, nullptr, 'm'},
+        {"ssl-cert", required_argument, nullptr, 'c'},
+        {"ssl-key", required_argument, nullptr, 'k'},
         {"help", no_argument, nullptr, 'h'},
         {nullptr, no_argument, nullptr, 0}
     };
@@ -39,6 +41,12 @@ ServerConfig ServerConfig::parse(int argc, char* argv[]) {
             case 'm':
                 cfg.max_body_size = static_cast<size_t>(std::stoull(optarg));
                 break;
+            case 'c':
+                cfg.ssl_cert = optarg;
+                break;
+            case 'k':
+                cfg.ssl_key = optarg;
+                break;
             case 'h':
             case '?':
             default:
@@ -48,6 +56,8 @@ ServerConfig ServerConfig::parse(int argc, char* argv[]) {
                           << "  -l, --log-level <level>     Log level (DEBUG, INFO, WARN, ERROR) (default: INFO)\n"
                           << "  -s, --static-dir <dir>      Directory for static files (default: ./public)\n"
                           << "  -m, --max-body-size <bytes> Maximum HTTP request body size (default: 10485760 (10MB))\n"
+                          << "  -c, --ssl-cert <file>       Path to SSL/TLS certificate file\n"
+                          << "  -k, --ssl-key <file>        Path to SSL/TLS private key file\n"
                           << "  -h, --help                  Show this help message\n";
                 std::exit(0);
         }

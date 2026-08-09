@@ -4,6 +4,7 @@
 #include "EventLoop.hpp"
 #include "../routing/Router.hpp"
 #include "../config/Config.hpp"
+#include "../network/TlsContext.hpp"
 #include <memory>
 
 namespace server {
@@ -38,6 +39,7 @@ private:
     config::ServerConfig config_;
     routing::Router router_;
     std::unique_ptr<Listener> listener_;
+    std::unique_ptr<network::TlsContext> tls_context_;
     std::unique_ptr<EventLoop> event_loop_;
 };
 

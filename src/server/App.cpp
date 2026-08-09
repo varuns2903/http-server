@@ -5,6 +5,9 @@ namespace server {
 
 App::App(const config::ServerConfig& config) : config_(config) {
     utils::Logger::init(config.log_level);
+    if (!config_.ssl_cert.empty() && !config_.ssl_key.empty()) {
+        tls_context_ = std::make_unique<network::TlsContext>(config_.ssl_cert, config_.ssl_key);
+    }
 }
 
 App::~App() {
@@ -50,7 +53,7 @@ void App::listen() {
     listener_ = std::make_unique<Listener>(config_.port);
     listener_->start();
     
-    event_loop_ = std::make_unique<EventLoop>(*listener_, router_, config_);
+    event_loop_ = std::make_unique<EventLoop>(*listener_, router_, config_, tls_context_.get());
     
     LOG_INFO("App started listening on port " << config_.port);
     event_loop_->run();

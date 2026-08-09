@@ -4,6 +4,7 @@
 #include "../routing/Router.hpp"
 #include "../concurrency/ThreadPool.hpp"
 #include "TimerManager.hpp"
+#include "../network/TlsContext.hpp"
 #include <vector>
 #include <string_view>
 
@@ -13,7 +14,7 @@ class ConnectionManager; // Forward declaration
 
 class Connection {
 public:
-    Connection(network::Socket socket, network::Epoll& epoll, const routing::Router& router, ConnectionManager& manager, concurrency::ThreadPool& thread_pool, TimerManager& timer_manager, size_t max_body_size);
+    Connection(network::Socket socket, network::Epoll& epoll, const routing::Router& router, ConnectionManager& manager, concurrency::ThreadPool& thread_pool, TimerManager& timer_manager, size_t max_body_size, network::TlsContext* tls_context = nullptr);
     ~Connection();
 
     Connection(const Connection&) = delete;
@@ -46,6 +47,9 @@ private:
     off_t file_offset_{0};
     
     size_t max_body_size_;
+    
+    SSL* ssl_{nullptr};
+    bool is_tls_handshake_complete_{false};
 };
 
 } // namespace server

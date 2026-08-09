@@ -18,9 +18,12 @@ if(ENABLE_SANITIZERS AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_link_options(-fsanitize=address,undefined)
 endif()
 
+find_package(OpenSSL REQUIRED)
+
 # Core static library
 add_library(server_core STATIC
     src/network/Socket.cpp
+    src/network/TlsContext.cpp
     src/server/Listener.cpp
     src/config/Config.cpp
     src/utils/Logger.cpp
@@ -39,6 +42,8 @@ add_library(server_core STATIC
 )
 
 add_library(HttpServer::core ALIAS server_core)
+
+target_link_libraries(server_core PUBLIC OpenSSL::SSL OpenSSL::Crypto)
 
 target_include_directories(server_core PUBLIC 
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>

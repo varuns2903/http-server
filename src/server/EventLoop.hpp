@@ -6,13 +6,14 @@
 #include "../concurrency/ThreadPool.hpp"
 #include "TimerManager.hpp"
 #include "../config/Config.hpp"
+#include "../network/TlsContext.hpp"
 #include <atomic>
 
 namespace server {
 
 class EventLoop {
 public:
-    EventLoop(Listener& listener, const routing::Router& router, const config::ServerConfig& config);
+    EventLoop(Listener& listener, const routing::Router& router, const config::ServerConfig& config, network::TlsContext* tls_context = nullptr);
     void run();
     void stop();
 

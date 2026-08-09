@@ -7,14 +7,24 @@
 
 namespace server {
 
-Connection::Connection(network::Socket socket, network::Epoll& epoll, const routing::Router& router, ConnectionManager& manager, concurrency::ThreadPool& thread_pool, TimerManager& timer_manager, size_t max_body_size)
+Connection::Connection(network::Socket socket, network::Epoll& epoll, const routing::Router& router, ConnectionManager& manager, concurrency::ThreadPool& thread_pool, TimerManager& timer_manager, size_t max_body_size, network::TlsContext* tls_context)
     : socket_(std::move(socket)), epoll_(epoll), router_(router), manager_(manager), thread_pool_(thread_pool), timer_manager_(timer_manager), max_body_size_(max_body_size) {
+    
+    if (tls_context) {
+        ssl_ = SSL_new(tls_context->get());
+        SSL_set_fd(ssl_, socket_.fd());
+        SSL_set_accept_state(ssl_); // Set to server mode
+    }
+    
     reset_timer(); // Start the 10-second idle timeout
 }
 
 Connection::~Connection() {
     if (current_timer_id_ != 0) {
         timer_manager_.cancel_timer(current_timer_id_);
+    }
+    if (ssl_) {
+        SSL_free(ssl_);
     }
     if (file_fd_ != -1) {
         close(file_fd_);
@@ -33,19 +43,48 @@ void Connection::reset_timer() {
 void Connection::handle_read() {
     reset_timer(); // Client sent data, reset their timeout!
     
+    if (ssl_ && !is_tls_handshake_complete_) {
+        int ret = SSL_do_handshake(ssl_);
+        if (ret == 1) {
+            is_tls_handshake_complete_ = true;
+        } else {
+            int err = SSL_get_error(ssl_, ret);
+            if (err == SSL_ERROR_WANT_READ) {
+                epoll_.modify(socket_.fd(), EPOLLIN | EPOLLONESHOT);
+                return;
+            } else if (err == SSL_ERROR_WANT_WRITE) {
+                epoll_.modify(socket_.fd(), EPOLLIN | EPOLLOUT | EPOLLONESHOT);
+                return;
+            } else {
+                std::cerr << "TLS handshake failed on FD " << socket_.fd() << std::endl;
+                manager_.remove_connection(socket_.fd());
+                return;
+            }
+        }
+    }
+    
     char buffer[4096];
     
     // Read from the non-blocking socket until EAGAIN
     while (true) {
-        ssize_t bytes_read = recv(socket_.fd(), buffer, sizeof(buffer), 0);
+        ssize_t bytes_read;
+        if (ssl_) {
+            bytes_read = SSL_read(ssl_, buffer, sizeof(buffer));
+        } else {
+            bytes_read = recv(socket_.fd(), buffer, sizeof(buffer), 0);
+        }
 
-        if (bytes_read == -1) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                break; // No more data right now, exit the read loop
+        if (bytes_read <= 0) {
+            if (ssl_) {
+                int err = SSL_get_error(ssl_, static_cast<int>(bytes_read));
+                if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
+                    break;
+                }
+            } else {
+                if (bytes_read == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+                    break; // No more data right now, exit the read loop
+                }
             }
-            manager_.remove_connection(socket_.fd());
-            return;
-        } else if (bytes_read == 0) {
             manager_.remove_connection(socket_.fd());
             return;
         } else {
@@ -151,11 +190,25 @@ void Connection::handle_write() {
     
     // 1. Drain the write_buffer_ (which holds headers or string bodies)
     if (!write_buffer_.empty()) {
-        ssize_t bytes_sent = send(socket_.fd(), write_buffer_.data(), write_buffer_.size(), 0);
-        if (bytes_sent == -1) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                epoll_.modify(socket_.fd(), EPOLLIN | EPOLLOUT | EPOLLONESHOT);
-                return;
+        ssize_t bytes_sent;
+        if (ssl_) {
+            bytes_sent = SSL_write(ssl_, write_buffer_.data(), static_cast<int>(write_buffer_.size()));
+        } else {
+            bytes_sent = send(socket_.fd(), write_buffer_.data(), write_buffer_.size(), 0);
+        }
+        
+        if (bytes_sent <= 0) {
+            if (ssl_) {
+                int err = SSL_get_error(ssl_, static_cast<int>(bytes_sent));
+                if (err == SSL_ERROR_WANT_WRITE || err == SSL_ERROR_WANT_READ) {
+                    epoll_.modify(socket_.fd(), EPOLLIN | EPOLLOUT | EPOLLONESHOT);
+                    return;
+                }
+            } else {
+                if (bytes_sent == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+                    epoll_.modify(socket_.fd(), EPOLLIN | EPOLLOUT | EPOLLONESHOT);
+                    return;
+                }
             }
             manager_.remove_connection(socket_.fd());
             return;
@@ -168,18 +221,43 @@ void Connection::handle_write() {
         }
     }
 
-    // 2. If we have a file to send, do it via zero-copy sendfile
+    // 2. If we have a file to send, do it via zero-copy sendfile (or SSL_write for TLS)
     if (file_fd_ != -1 && file_offset_ < file_size_) {
-        // file_offset_ is updated automatically by sendfile
-        ssize_t sent = sendfile(socket_.fd(), file_fd_, &file_offset_, static_cast<size_t>(file_size_ - file_offset_));
-        
-        if (sent == -1) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                epoll_.modify(socket_.fd(), EPOLLIN | EPOLLOUT | EPOLLONESHOT);
+        if (ssl_) {
+            // Cannot use zero-copy sendfile with TLS. Must read into userspace and SSL_write.
+            char file_buf[4096];
+            size_t to_read = static_cast<size_t>(std::min(static_cast<off_t>(sizeof(file_buf)), file_size_ - file_offset_));
+            ssize_t bytes_read = pread(file_fd_, file_buf, to_read, file_offset_);
+            
+            if (bytes_read > 0) {
+                ssize_t bytes_sent = SSL_write(ssl_, file_buf, static_cast<int>(bytes_read));
+                if (bytes_sent <= 0) {
+                    int err = SSL_get_error(ssl_, static_cast<int>(bytes_sent));
+                    if (err == SSL_ERROR_WANT_WRITE || err == SSL_ERROR_WANT_READ) {
+                        epoll_.modify(socket_.fd(), EPOLLIN | EPOLLOUT | EPOLLONESHOT);
+                        return;
+                    }
+                    manager_.remove_connection(socket_.fd());
+                    return;
+                }
+                file_offset_ += bytes_sent;
+            } else {
+                // File read error
+                manager_.remove_connection(socket_.fd());
                 return;
             }
-            manager_.remove_connection(socket_.fd());
-            return;
+        } else {
+            // file_offset_ is updated automatically by sendfile
+            ssize_t sent = sendfile(socket_.fd(), file_fd_, &file_offset_, static_cast<size_t>(file_size_ - file_offset_));
+            
+            if (sent == -1) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    epoll_.modify(socket_.fd(), EPOLLIN | EPOLLOUT | EPOLLONESHOT);
+                    return;
+                }
+                manager_.remove_connection(socket_.fd());
+                return;
+            }
         }
         
         if (file_offset_ < file_size_) {

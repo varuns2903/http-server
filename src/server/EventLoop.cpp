@@ -4,8 +4,8 @@
 
 namespace server {
 
-EventLoop::EventLoop(Listener& listener, const routing::Router& router, const config::ServerConfig& config)
-    : listener_(listener), thread_pool_(config.worker_threads), connection_manager_(epoll_, router, thread_pool_, timer_manager_, config.max_body_size) {
+EventLoop::EventLoop(Listener& listener, const routing::Router& router, const config::ServerConfig& config, network::TlsContext* tls_context)
+    : listener_(listener), thread_pool_(config.worker_threads), connection_manager_(epoll_, router, thread_pool_, timer_manager_, config.max_body_size, tls_context) {
     
     // Tell epoll to watch the listener socket for incoming connections (EPOLLIN)
     epoll_.add(listener_.fd(), EPOLLIN);
