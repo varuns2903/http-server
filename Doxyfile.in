@@ -1,0 +1,15 @@
+PROJECT_NAME           = "@PROJECT_NAME@"
+PROJECT_NUMBER         = "@PROJECT_VERSION@"
+PROJECT_BRIEF          = "A high-performance asynchronous C++20 HTTP server framework."
+OUTPUT_DIRECTORY       = "@CMAKE_CURRENT_BINARY_DIR@/docs"
+INPUT                  = "@CMAKE_CURRENT_SOURCE_DIR@/src"
+RECURSIVE              = YES
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = YES
+GENERATE_LATEX         = NO
+GENERATE_HTML          = YES
+HTML_OUTPUT            = html
+MACRO_EXPANSION        = YES
+OPTIMIZE_OUTPUT_FOR_C  = NO
+WARN_IF_UNDOCUMENTED   = NO
+GENERATE_TREEVIEW      = YES

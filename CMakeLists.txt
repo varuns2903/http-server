@@ -80,9 +80,47 @@ install(EXPORT HttpServerTargets
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/HttpServer
 )
 
+include(CMakePackageConfigHelpers)
+configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/HttpServerConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/HttpServerConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/HttpServer
+)
+
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/HttpServerConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/HttpServerConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/HttpServerConfigVersion.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/HttpServer
+)
+
+# Doxygen Configuration
+find_package(Doxygen)
+if(DOXYGEN_FOUND)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile @ONLY)
+    add_custom_target(docs
+        COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        COMMENT "Generating API documentation with Doxygen"
+        VERBATIM
+    )
+endif()
+
+# Examples
 # Examples
 add_executable(basic_server examples/basic_server.cpp)
 target_link_libraries(basic_server PRIVATE server_core)
+
+add_executable(rest_api examples/rest_api.cpp)
+target_link_libraries(rest_api PRIVATE server_core)
+
+add_executable(chat_server examples/chat_server.cpp)
+target_link_libraries(chat_server PRIVATE server_core)
 
 # Testing Setup (GoogleTest via FetchContent)
 include(FetchContent)
