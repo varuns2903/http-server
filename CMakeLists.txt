@@ -91,6 +91,7 @@ add_executable(http_server_tests
     tests/test_parser.cpp
     tests/test_router.cpp
     tests/test_threadpool.cpp
+    tests/test_websocket.cpp
 )
 target_link_libraries(http_server_tests PRIVATE gtest_main server_core)
 include(GoogleTest)
