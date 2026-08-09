@@ -7,6 +7,10 @@
 #include "../network/TlsContext.hpp"
 #include <vector>
 #include <string_view>
+#include <memory>
+#include <mutex>
+
+namespace http::websocket { class WebSocketConnection; }
 
 namespace server {
 
@@ -28,6 +32,10 @@ public:
     void handle_read();
     void handle_write();
 
+    void write_raw(const std::vector<char>& data);
+    void mark_for_close();
+    void upgrade_to_websocket(std::unique_ptr<http::websocket::WebSocketConnection> ws_conn);
+
 private:
     void process_request();
     void send_data(std::string_view data);
@@ -42,6 +50,7 @@ private:
     
     std::vector<char> read_buffer_;
     std::vector<char> write_buffer_;
+    std::mutex write_mutex_;
 
     bool is_request_complete() const;
     bool should_close_{false};
@@ -56,6 +65,8 @@ private:
     
     SSL* ssl_{nullptr};
     bool is_tls_handshake_complete_{false};
+    
+    std::unique_ptr<http::websocket::WebSocketConnection> ws_connection_;
 };
 
 } // namespace server

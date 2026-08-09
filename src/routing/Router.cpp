@@ -33,6 +33,18 @@ std::vector<std::string> Router::split_path(std::string_view path) const {
     return segments;
 }
 
+bool Router::has_ws_route(const std::string& path) const {
+    return ws_routes_.find(path) != ws_routes_.end();
+}
+
+WsHandler Router::get_ws_route(const std::string& path) const {
+    auto it = ws_routes_.find(path);
+    if (it != ws_routes_.end()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
 void Router::add_route(http::HttpMethod method, const std::string& path, RouteHandler handler) {
     if (path.find(':') != std::string::npos || path.find('*') != std::string::npos) {
         DynamicRoute dr;
@@ -44,6 +56,10 @@ void Router::add_route(http::HttpMethod method, const std::string& path, RouteHa
         std::string key = make_route_key(method, path);
         routes_[key] = std::move(handler);
     }
+}
+
+void Router::ws(const std::string& path, WsHandler handler) {
+    ws_routes_[path] = std::move(handler);
 }
 
 void Router::use(Middleware m) {

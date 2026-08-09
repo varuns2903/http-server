@@ -69,6 +69,7 @@ std::string HttpResponse::serialize_headers() const {
     std::ostringstream oss;
     oss << "HTTP/1.1 ";
     switch (status_code) {
+        case HttpStatus::SwitchingProtocols: oss << "101 Switching Protocols\r\n"; break;
         case HttpStatus::OK: oss << "200 OK\r\n"; break;
         case HttpStatus::NoContent: oss << "204 No Content\r\n"; break;
         case HttpStatus::BadRequest: oss << "400 Bad Request\r\n"; break;

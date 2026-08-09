@@ -43,15 +43,22 @@ int main(int argc, char* argv[]) {
         app.use(middleware::static_files(config.static_dir));
 
         // Fluent routing
-        app.get("/", [](const http::HttpRequest& req, http::HttpResponse& res) {
-            res.html("<h1>Welcome to the C++ Web Framework!</h1>");
+        app.get("/", [](const http::HttpRequest& /*req*/, http::HttpResponse& res) {
+            res.body = "<h1>Welcome to Orbit Framework!</h1>";
+            res.headers["Content-Type"] = "text/html";
         })
-        .get("/api/data", [](const http::HttpRequest& req, http::HttpResponse& res) {
-            nlohmann::json j = {
-                {"status", "success"},
-                {"message", "epoll is fast!"}
-            };
-            res.json(j);
+        .get("/api/data", [](const http::HttpRequest& /*req*/, http::HttpResponse& res) {
+            res.body = R"({"status": "success", "data": [1, 2, 3]})";
+            res.headers["Content-Type"] = "application/json";
+        })
+        .ws("/chat", [](http::websocket::WebSocketConnection& ws) {
+            ws.on_message([&ws](const std::string& msg) {
+                std::cout << "Received WS Message: " << msg << std::endl;
+                ws.send("Echo: " + msg);
+            });
+            ws.on_close([]() {
+                std::cout << "WS connection closed." << std::endl;
+            });
         })
         .get("/users/:id", [](const http::HttpRequest& req, http::HttpResponse& res) {
             std::string user_id = req.params.at("id");

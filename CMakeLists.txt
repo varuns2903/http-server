@@ -35,6 +35,7 @@ add_library(server_core STATIC
     src/concurrency/ThreadPool.cpp
     src/http/HttpParser.cpp
     src/http/HttpResponse.cpp
+    src/http/WebSocketConnection.cpp
     src/routing/Router.cpp
     src/server/App.cpp
     src/middleware/StaticFiles.cpp

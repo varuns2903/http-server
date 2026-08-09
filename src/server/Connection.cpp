@@ -1,6 +1,10 @@
 #include "Connection.hpp"
 #include "ConnectionManager.hpp"
 #include "../http/HttpParser.hpp"
+#include "../http/WebSocket.hpp"
+#include "../http/WebSocketConnection.hpp"
+#include "../config/Config.hpp"
+#include <unistd.h>
 #include <iostream>
 #include <sys/socket.h>
 #include <sys/sendfile.h>
@@ -101,7 +105,11 @@ void Connection::handle_read() {
     }
 
     if (state_ == ConnectionState::WEBSOCKET) {
-        // TODO: Offload to WebSocket frame parser thread
+        if (ws_connection_) {
+            ws_connection_->process_raw_data(read_buffer_);
+        }
+        // Need to re-arm EPOLLONESHOT so we can read next frame
+        epoll_.modify(socket_.fd(), EPOLLIN | EPOLLONESHOT);
         return;
     }
 
@@ -123,12 +131,43 @@ void Connection::process_request() {
     auto parsed_req = http::HttpParser::parse(raw_request);
     
     if (parsed_req) {
+        http::HttpRequest& req = *parsed_req;
+        
+        // WebSocket Upgrade Interception
+        auto upgrade_it = req.headers.find("Upgrade");
+        if (upgrade_it != req.headers.end() && upgrade_it->second == "websocket") {
+            if (router_.has_ws_route(req.uri)) {
+                auto key_it = req.headers.find("Sec-WebSocket-Key");
+                if (key_it != req.headers.end()) {
+                    std::string accept_key = http::websocket::Handshake::generate_accept_key(std::string(key_it->second));
+                    
+                    http::HttpResponse res;
+                    res.status_code = http::HttpStatus::SwitchingProtocols;
+                    res.headers["Upgrade"] = "websocket";
+                    res.headers["Connection"] = "Upgrade";
+                    res.headers["Sec-WebSocket-Accept"] = accept_key;
+                    
+                    send_data(res.serialize());
+                    
+                    auto ws_conn = std::make_unique<http::websocket::WebSocketConnection>(*this);
+                    auto handler = router_.get_ws_route(req.uri);
+                    
+                    // Call the user callback synchronously (it configures the event handlers)
+                    handler(*ws_conn);
+                    
+                    // Modify the state!
+                    upgrade_to_websocket(std::move(ws_conn));
+                    return; // Bypass standard HTTP routing
+                }
+            }
+        }
+
         http::HttpResponse response;
-        router_.route(*parsed_req, response);
+        router_.route(req, response);
         
         bool keep_alive = true;
-        auto it = parsed_req->headers.find("Connection");
-        if (it != parsed_req->headers.end() && it->second == "close") {
+        auto it = req.headers.find("Connection");
+        if (it != req.headers.end() && it->second == "close") {
             keep_alive = false;
         }
 
@@ -194,12 +233,20 @@ void Connection::handle_write() {
     reset_timer(); // Writing to client, reset their timeout!
     
     // 1. Drain the write_buffer_ (which holds headers or string bodies)
-    if (!write_buffer_.empty()) {
+    std::vector<char> chunk_to_write;
+    {
+        std::lock_guard<std::mutex> lock(write_mutex_);
+        if (!write_buffer_.empty()) {
+            chunk_to_write = write_buffer_; // Copy to avoid holding lock during I/O
+        }
+    }
+
+    if (!chunk_to_write.empty()) {
         ssize_t bytes_sent;
         if (ssl_) {
-            bytes_sent = SSL_write(ssl_, write_buffer_.data(), static_cast<int>(write_buffer_.size()));
+            bytes_sent = SSL_write(ssl_, chunk_to_write.data(), static_cast<int>(chunk_to_write.size()));
         } else {
-            bytes_sent = send(socket_.fd(), write_buffer_.data(), write_buffer_.size(), 0);
+            bytes_sent = send(socket_.fd(), chunk_to_write.data(), chunk_to_write.size(), 0);
         }
         
         if (bytes_sent <= 0) {
@@ -218,11 +265,14 @@ void Connection::handle_write() {
             manager_.remove_connection(socket_.fd());
             return;
         }
-        write_buffer_.erase(write_buffer_.begin(), write_buffer_.begin() + static_cast<std::ptrdiff_t>(bytes_sent));
         
-        if (!write_buffer_.empty()) {
-            epoll_.modify(socket_.fd(), EPOLLIN | EPOLLOUT | EPOLLONESHOT);
-            return; // Still have headers to send
+        {
+            std::lock_guard<std::mutex> lock(write_mutex_);
+            write_buffer_.erase(write_buffer_.begin(), write_buffer_.begin() + static_cast<std::ptrdiff_t>(bytes_sent));
+            if (!write_buffer_.empty()) {
+                epoll_.modify(socket_.fd(), EPOLLIN | EPOLLOUT | EPOLLONESHOT);
+                return; // Still have headers to send
+            }
         }
     }
 
@@ -276,21 +326,38 @@ void Connection::handle_write() {
         file_fd_ = -1;
     }
 
-    // 3. We finished writing everything!
+    // After writing, if we should close the connection, do so.
+    // However, if we are in WEBSOCKET state, should_close_ indicates the close frame was sent.
     if (should_close_) {
         manager_.remove_connection(socket_.fd());
-    } else {
-        // Revert to only watching for new incoming requests
-        epoll_.modify(socket_.fd(), EPOLLIN | EPOLLONESHOT);
-        
-        // Wait! If there is STILL data in the read_buffer_ from pipelining, 
-        // we should process it immediately instead of waiting for epoll!
-        if (is_request_complete()) {
-            thread_pool_.enqueue([this]() {
-                this->process_request();
-            });
-        }
+        return;
     }
+    
+    epoll_.modify(socket_.fd(), EPOLLIN | EPOLLONESHOT);
+    
+    if (state_ == ConnectionState::HTTP && is_request_complete()) {
+        thread_pool_.enqueue([this]() {
+            this->process_request();
+        });
+    }
+}
+
+void Connection::write_raw(const std::vector<char>& data) {
+    {
+        std::lock_guard<std::mutex> lock(write_mutex_);
+        write_buffer_.insert(write_buffer_.end(), data.begin(), data.end());
+    }
+    epoll_.modify(socket_.fd(), EPOLLIN | EPOLLOUT | EPOLLONESHOT);
+}
+
+void Connection::mark_for_close() {
+    should_close_ = true;
+    epoll_.modify(socket_.fd(), EPOLLIN | EPOLLOUT | EPOLLONESHOT);
+}
+
+void Connection::upgrade_to_websocket(std::unique_ptr<http::websocket::WebSocketConnection> ws_conn) {
+    ws_connection_ = std::move(ws_conn);
+    state_ = ConnectionState::WEBSOCKET;
 }
 
 bool Connection::is_request_complete() const {

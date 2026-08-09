@@ -28,6 +28,12 @@ public:
     App& patch(const std::string& path, routing::RouteHandler handler);
     App& del(const std::string& path, routing::RouteHandler handler);
     App& options(const std::string& path, routing::RouteHandler handler);
+    
+    // WebSockets
+    App& ws(const std::string& path, routing::WsHandler handler) {
+        router_.ws(path, std::move(handler));
+        return *this;
+    }
 
     // Start the server (blocking)
     void listen();

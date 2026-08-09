@@ -8,6 +8,7 @@
 namespace http {
 
 enum class HttpStatus {
+    SwitchingProtocols = 101,
     OK = 200,
     NoContent = 204,
     BadRequest = 400,
