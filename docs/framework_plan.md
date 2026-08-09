@@ -46,7 +46,7 @@ To be a true framework, developers need to be able to easily link against it.
 *   **4.3 Multi-part Form Parsing** [PENDING]
     *   Add parsing for file uploads (`multipart/form-data`).
 
-## Phase 5: Distribution & Documentation [PENDING]
+## Phase 5: Testing & Open-Source Packaging [COMPLETED]
 *   **5.1 Package Managers**
     *   Publish the framework to **vcpkg** and **Conan** so users can install it with a single command.
 *   **5.2 Example Projects**
