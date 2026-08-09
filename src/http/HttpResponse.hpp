@@ -10,10 +10,14 @@ namespace http {
 enum class HttpStatus {
     SwitchingProtocols = 101,
     OK = 200,
+    Created = 201,
     NoContent = 204,
     BadRequest = 400,
     Forbidden = 403,
     NotFound = 404,
+    PayloadTooLarge = 413,
+    TooManyRequests = 429,
+    RequestHeaderFieldsTooLarge = 431,
     InternalServerError = 500
 };
 

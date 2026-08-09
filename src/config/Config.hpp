@@ -4,6 +4,11 @@
 
 namespace config {
 
+enum class EventEngine {
+    Epoll,
+    IoUring
+};
+
 struct ServerConfig {
     uint16_t port{8080};
     size_t worker_threads{4};
@@ -12,6 +17,7 @@ struct ServerConfig {
     size_t max_body_size{10485760}; // Default 10 MB limit
     std::string ssl_cert{""};
     std::string ssl_key{""};
+    EventEngine engine{EventEngine::IoUring}; // Default to our new fast backend!
     
     static ServerConfig parse(int argc, char* argv[]);
 };

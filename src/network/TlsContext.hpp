@@ -21,4 +21,18 @@ private:
     SSL_CTX* ctx_{nullptr};
 };
 
+class ClientTlsContext {
+public:
+    ClientTlsContext();
+    ~ClientTlsContext();
+
+    ClientTlsContext(const ClientTlsContext&) = delete;
+    ClientTlsContext& operator=(const ClientTlsContext&) = delete;
+
+    SSL_CTX* get() const { return ctx_; }
+
+private:
+    SSL_CTX* ctx_{nullptr};
+};
+
 } // namespace network

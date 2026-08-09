@@ -1,5 +1,5 @@
 #pragma once
-#include "../network/Epoll.hpp"
+#include "../network/Proactor.hpp"
 #include "Listener.hpp"
 #include "../routing/Router.hpp"
 #include "ConnectionManager.hpp"
@@ -18,10 +18,10 @@ public:
     void stop();
 
 private:
-    void handle_new_connections();
+    void do_accept();
 
     Listener& listener_;
-    network::Epoll epoll_;
+    std::unique_ptr<network::Proactor> proactor_;
     concurrency::ThreadPool thread_pool_;
     TimerManager timer_manager_;
     ConnectionManager connection_manager_;

@@ -1,4 +1,6 @@
-#include "Connection.hpp"
+import sys
+
+content = """#include "Connection.hpp"
 #include "ConnectionManager.hpp"
 #include "../http/HttpParser.hpp"
 #include "../http/WebSocket.hpp"
@@ -10,8 +12,8 @@
 
 namespace server {
 
-Connection::Connection(network::Socket socket, const std::string& client_ip, network::Proactor& proactor, const routing::Router& router, ConnectionManager& manager, concurrency::ThreadPool& thread_pool, TimerManager& timer_manager, size_t max_body_size, network::TlsContext* tls_context)
-    : socket_(std::move(socket)), client_ip_(client_ip), proactor_(proactor), router_(router), manager_(manager), thread_pool_(thread_pool), timer_manager_(timer_manager), max_body_size_(max_body_size) {
+Connection::Connection(network::Socket socket, network::Proactor& proactor, const routing::Router& router, ConnectionManager& manager, concurrency::ThreadPool& thread_pool, TimerManager& timer_manager, size_t max_body_size, network::TlsContext* tls_context)
+    : socket_(std::move(socket)), proactor_(proactor), router_(router), manager_(manager), thread_pool_(thread_pool), timer_manager_(timer_manager), max_body_size_(max_body_size) {
     
     if (tls_context) {
         ssl_ = SSL_new(tls_context->get());
@@ -59,7 +61,6 @@ void Connection::trigger_read() {
 
 void Connection::on_read_complete(ssize_t bytes_read) {
     if (bytes_read <= 0) {
-        std::cout << "on_read_complete closed with bytes_read=" << bytes_read << std::endl;
         manager_.remove_connection(socket_.fd());
         return;
     }
@@ -101,6 +102,11 @@ void Connection::on_read_complete(ssize_t bytes_read) {
                 if (ret > 0) {
                     std::lock_guard<std::mutex> lock(read_mutex_);
                     read_buffer_.insert(read_buffer_.end(), clear_buf, clear_buf + ret);
+                    
+                    if (read_buffer_.size() > max_body_size_) {
+                        manager_.remove_connection(socket_.fd());
+                        return;
+                    }
                 } else {
                     break;
                 }
@@ -116,9 +122,12 @@ void Connection::on_read_complete(ssize_t bytes_read) {
     } else {
         std::lock_guard<std::mutex> lock(read_mutex_);
         read_buffer_.insert(read_buffer_.end(), async_read_buf_, async_read_buf_ + bytes_read);
+        
+        if (read_buffer_.size() > max_body_size_) {
+            manager_.remove_connection(socket_.fd());
+            return;
+        }
     }
-    
-    // We defer checking max body size to check_request_state()
     
     if (!tls_write_buffer_.empty()) {
         trigger_write();
@@ -132,37 +141,29 @@ void Connection::on_read_complete(ssize_t bytes_read) {
         trigger_read();
         return;
     }
-    RequestState state = check_request_state();
     
-    if (state == RequestState::COMPLETE) {
-        if (!is_processing_request_) {
-            is_processing_request_ = true;
-            auto self = shared_from_this();
-            thread_pool_.enqueue([self]() {
-                self->process_request();
-            });
-        }
-    } else if (state == RequestState::ERROR_PAYLOAD_TOO_LARGE) {
-        send_error(http::HttpStatus::PayloadTooLarge, "413 Payload Too Large");
-    } else if (state == RequestState::ERROR_HEADERS_TOO_LARGE) {
-        send_error(http::HttpStatus::RequestHeaderFieldsTooLarge, "431 Request Header Fields Too Large");
+    if (!is_processing_request_ && is_request_complete()) {
+        is_processing_request_ = true;
+        auto self = shared_from_this();
+        thread_pool_.enqueue([self]() {
+            self->process_request();
+        });
     } else {
         trigger_read();
     }
 }
 
 void Connection::process_request() {
-    default_headers_.clear();
+    std::string current_buffer;
     {
         std::lock_guard<std::mutex> lock(read_mutex_);
-        current_request_buffer_ = std::string(read_buffer_.begin(), read_buffer_.end());
+        current_buffer = std::string(read_buffer_.begin(), read_buffer_.end());
     }
-    std::string_view raw_request(current_request_buffer_.data(), current_request_buffer_.size());
+    std::string_view raw_request(current_buffer.data(), current_buffer.size());
     auto parsed_req = http::HttpParser::parse(raw_request);
     
     if (parsed_req) {
         http::HttpRequest& req = *parsed_req;
-        req.client_ip = client_ip_;
         
         // WebSocket Upgrade Interception
         auto upgrade_it = req.headers.find("Upgrade");
@@ -184,7 +185,7 @@ void Connection::process_request() {
                     auto handler = router_.get_ws_route(req.uri);
                     
                     // Erase the HTTP request from the buffer before switching states!
-                    size_t headers_end = raw_request.find("\r\n\r\n");
+                    size_t headers_end = raw_request.find("\\r\\n\\r\\n");
                     size_t consumed_bytes = headers_end + 4;
                     {
                         std::lock_guard<std::mutex> lock(read_mutex_);
@@ -217,18 +218,27 @@ void Connection::process_request() {
             }
         }
 
-        // Set should_close based on request headers
+        http::HttpResponse response;
+        router_.route(req, response);
+        
+        bool keep_alive = true;
         auto it = req.headers.find("Connection");
         if (it != req.headers.end() && it->second == "close") {
-            should_close_ = true;
+            keep_alive = false;
+        }
+
+        if (!keep_alive) {
+            response.headers["Connection"] = "close";
+            should_close_ = true; 
+        } else {
+            response.headers["Connection"] = "keep-alive";
         }
         
-        // Erase request from read buffer
-        size_t headers_end = raw_request.find("\r\n\r\n");
+        size_t headers_end = raw_request.find("\\r\\n\\r\\n");
         size_t consumed_bytes = headers_end + 4;
         
-        auto cl_it = req.headers.find("Content-Length");
-        if (cl_it != req.headers.end()) {
+        auto cl_it = parsed_req->headers.find("Content-Length");
+        if (cl_it != parsed_req->headers.end()) {
             consumed_bytes += std::stoull(std::string(cl_it->second));
         }
         
@@ -241,8 +251,30 @@ void Connection::process_request() {
             }
         }
         
-        auto writer = std::dynamic_pointer_cast<http::ResponseWriter>(shared_from_this());
-        router_.route(req, writer);
+        bool is_file = (response.file_fd != -1);
+        std::string serialized_data;
+        
+        if (is_file) {
+            serialized_data = response.serialize_headers();
+            this->file_fd_ = response.file_fd;
+            this->file_size_ = response.file_size;
+            this->file_offset_ = 0;
+            response.file_fd = -1; // Steal the FD
+        } else {
+            serialized_data = response.serialize();
+        }
+
+        send_data(serialized_data);
+        is_processing_request_ = false;
+        
+        // Request pipelining
+        if (is_request_complete()) {
+            is_processing_request_ = true;
+            auto self = shared_from_this();
+            thread_pool_.enqueue([self]() {
+                self->process_request();
+            });
+        }
     } else {
         http::HttpResponse err_res;
         err_res.status_code = http::HttpStatus::BadRequest;
@@ -254,128 +286,9 @@ void Connection::process_request() {
             std::lock_guard<std::mutex> lock(read_mutex_);
             read_buffer_.clear();
         }
-        send(std::move(err_res));
-    }
-}
-
-void Connection::send_error(http::HttpStatus status, const std::string& message) {
-    http::HttpResponse err_res;
-    err_res.status_code = status;
-    err_res.set_body(message);
-    err_res.headers["Connection"] = "close";
-    should_close_ = true;
-    
-    {
-        std::lock_guard<std::mutex> lock(read_mutex_);
-        read_buffer_.clear();
-    }
-    
-    send(std::move(err_res));
-}
-
-void Connection::set_header(const std::string& key, const std::string& value) {
-    default_headers_[key] = value;
-}
-
-void Connection::send_headers(http::HttpResponse& response) {
-    for (const auto& [k, v] : default_headers_) {
-        if (response.headers.find(k) == response.headers.end()) {
-            response.headers[k] = v;
-        }
-    }
-
-    if (should_close_) {
-        response.headers["Connection"] = "close";
-    } else {
-        response.headers["Connection"] = "keep-alive";
-    }
-    
-    // Default to chunked transfer if no Content-Length
-    if (response.headers.find("Content-Length") == response.headers.end()) {
-        response.headers["Transfer-Encoding"] = "chunked";
-        is_chunked_ = true;
-    } else {
-        is_chunked_ = false;
-    }
-    
-    std::string serialized = response.serialize_headers();
-    send_data(serialized);
-}
-
-void Connection::send(http::HttpResponse&& response) {
-    for (const auto& [k, v] : default_headers_) {
-        if (response.headers.find(k) == response.headers.end()) {
-            response.headers[k] = v;
-        }
-    }
-
-    if (should_close_) {
-        response.headers["Connection"] = "close";
-    } else {
-        response.headers["Connection"] = "keep-alive";
-    }
-    
-    bool is_file = (response.file_fd != -1);
-    std::string serialized_data;
-    
-    if (is_file) {
-        serialized_data = response.serialize_headers();
-        this->file_fd_ = response.file_fd;
-        this->file_size_ = response.file_size;
-        this->file_offset_ = 0;
-        response.file_fd = -1; // Prevent the destructor from closing it
-    } else {
-        serialized_data = response.serialize();
-    }
-
-    send_data(serialized_data);
-    
-    is_processing_request_ = false;
-    RequestState state = check_request_state();
-    if (state == RequestState::COMPLETE) {
-        is_processing_request_ = true;
-        auto self = shared_from_this();
-        thread_pool_.enqueue([self]() {
-            self->process_request();
-        });
-    } else if (state == RequestState::ERROR_PAYLOAD_TOO_LARGE) {
-        send_error(http::HttpStatus::PayloadTooLarge, "413 Payload Too Large");
-    } else if (state == RequestState::ERROR_HEADERS_TOO_LARGE) {
-        send_error(http::HttpStatus::RequestHeaderFieldsTooLarge, "431 Request Header Fields Too Large");
-    }
-}
-
-void Connection::write_chunk(std::string_view chunk) {
-    if (is_chunked_) {
-        std::string formatted_chunk;
-        char hex_len[32];
-        snprintf(hex_len, sizeof(hex_len), "%zx\r\n", chunk.size());
-        formatted_chunk += hex_len;
-        formatted_chunk += chunk;
-        formatted_chunk += "\r\n";
-        send_data(formatted_chunk);
-    } else {
-        send_data(chunk);
-    }
-}
-
-void Connection::end() {
-    if (is_chunked_) {
-        send_data("0\r\n\r\n");
-    }
-    
-    is_processing_request_ = false;
-    RequestState state = check_request_state();
-    if (state == RequestState::COMPLETE) {
-        is_processing_request_ = true;
-        auto self = shared_from_this();
-        thread_pool_.enqueue([self]() {
-            self->process_request();
-        });
-    } else if (state == RequestState::ERROR_PAYLOAD_TOO_LARGE) {
-        send_error(http::HttpStatus::PayloadTooLarge, "413 Payload Too Large");
-    } else if (state == RequestState::ERROR_HEADERS_TOO_LARGE) {
-        send_error(http::HttpStatus::RequestHeaderFieldsTooLarge, "431 Request Header Fields Too Large");
+        std::string serialized = err_res.serialize();
+        send_data(serialized);
+        is_processing_request_ = false;
     }
 }
 
@@ -528,62 +441,39 @@ void Connection::upgrade_to_websocket(std::unique_ptr<http::websocket::WebSocket
     state_ = ConnectionState::WEBSOCKET;
 }
 
-RequestState Connection::check_request_state() const {
+bool Connection::is_request_complete() const {
     std::lock_guard<std::mutex> lock(read_mutex_);
     std::string_view buf_view(read_buffer_.data(), read_buffer_.size());
-    size_t headers_end = buf_view.find("\r\n\r\n");
+    size_t headers_end = buf_view.find("\\r\\n\\r\\n");
     
     if (headers_end == std::string_view::npos) {
-        // If we haven't found headers end, check if headers are too large
-        if (read_buffer_.size() > 8192) {
-            return RequestState::ERROR_HEADERS_TOO_LARGE;
-        }
-        return RequestState::INCOMPLETE;
-    }
-    
-    // Check if URI is too long (first line)
-    size_t first_line_end = buf_view.find("\r\n");
-    if (first_line_end != std::string_view::npos && first_line_end > 4096) {
-        return RequestState::ERROR_HEADERS_TOO_LARGE;
+        return false;
     }
     
     size_t content_length_pos = buf_view.find("Content-Length:");
     if (content_length_pos != std::string_view::npos && content_length_pos < headers_end) {
         size_t value_start = content_length_pos + 15;
-        while (value_start < headers_end && (buf_view[value_start] == ' ' || buf_view[value_start] == '	')) {
+        while (value_start < headers_end && (buf_view[value_start] == ' ' || buf_view[value_start] == '\t')) {
             value_start++;
         }
         
-        size_t value_end = buf_view.find("\r\n", value_start);
+        size_t value_end = buf_view.find("\\r\\n", value_start);
         std::string_view length_str = buf_view.substr(value_start, value_end - value_start);
         
         try {
             size_t content_length = std::stoull(std::string(length_str));
-            if (content_length > max_body_size_) {
-                return RequestState::ERROR_PAYLOAD_TOO_LARGE;
-            }
             size_t total_expected = headers_end + 4 + content_length;
-            if (read_buffer_.size() >= total_expected) {
-                return RequestState::COMPLETE;
-            }
+            return read_buffer_.size() >= total_expected;
         } catch (...) {
-            return RequestState::INCOMPLETE;
-        }
-    } else {
-        // No Content-Length. If it's chunked, we should parse chunks, but for now we just check total buffer size
-        if (read_buffer_.size() - (headers_end + 4) > max_body_size_) {
-            return RequestState::ERROR_PAYLOAD_TOO_LARGE;
+            return false;
         }
     }
     
-    if (headers_end != std::string_view::npos && content_length_pos == std::string_view::npos) {
-        // If no Content-Length and not Chunked, the request is complete (GET, etc.)
-        // But if it is chunked, we might need a better check. For now, assuming complete if no Content-Length
-        // Wait, HTTP standard says if no Content-Length and no Transfer-Encoding, body length is 0.
-        return RequestState::COMPLETE;
-    }
-    
-    return RequestState::INCOMPLETE; 
+    return true; 
 }
 
 } // namespace server
+"""
+
+with open('src/server/Connection.cpp', 'w') as f:
+    f.write(content)

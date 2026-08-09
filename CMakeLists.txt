@@ -23,6 +23,7 @@ find_package(OpenSSL REQUIRED)
 # Core static library
 add_library(server_core STATIC
     src/network/Socket.cpp
+    src/network/ConnectionPool.cpp
     src/network/TlsContext.cpp
     src/server/Listener.cpp
     src/config/Config.cpp
@@ -31,7 +32,8 @@ add_library(server_core STATIC
     src/server/Connection.cpp
     src/server/ConnectionManager.cpp
     src/server/TimerManager.cpp
-    src/network/Epoll.cpp
+    src/network/EpollProactor.cpp
+    src/network/IoUringProactor.cpp
     src/concurrency/ThreadPool.cpp
     src/http/HttpParser.cpp
     src/http/HttpResponse.cpp
@@ -40,11 +42,16 @@ add_library(server_core STATIC
     src/server/App.cpp
     src/middleware/StaticFiles.cpp
     src/middleware/Cors.cpp
+    src/middleware/Proxy.cpp
+    src/middleware/RateLimiter.cpp
+    src/middleware/DistributedRateLimiter.cpp
+    src/middleware/SessionManager.cpp
+    src/database/RedisClient.cpp
 )
 
 add_library(HttpServer::core ALIAS server_core)
 
-target_link_libraries(server_core PUBLIC OpenSSL::SSL OpenSSL::Crypto)
+target_link_libraries(server_core PUBLIC OpenSSL::SSL OpenSSL::Crypto uring)
 
 target_include_directories(server_core PUBLIC 
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>

@@ -71,16 +71,27 @@ std::string HttpResponse::serialize_headers() const {
     switch (status_code) {
         case HttpStatus::SwitchingProtocols: oss << "101 Switching Protocols\r\n"; break;
         case HttpStatus::OK: oss << "200 OK\r\n"; break;
+        case HttpStatus::Created: oss << "201 Created\r\n"; break;
         case HttpStatus::NoContent: oss << "204 No Content\r\n"; break;
         case HttpStatus::BadRequest: oss << "400 Bad Request\r\n"; break;
         case HttpStatus::Forbidden: oss << "403 Forbidden\r\n"; break;
         case HttpStatus::NotFound: oss << "404 Not Found\r\n"; break;
+        case HttpStatus::PayloadTooLarge: oss << "413 Payload Too Large\r\n"; break;
+        case HttpStatus::TooManyRequests: oss << "429 Too Many Requests\r\n"; break;
+        case HttpStatus::RequestHeaderFieldsTooLarge: oss << "431 Request Header Fields Too Large\r\n"; break;
         case HttpStatus::InternalServerError: oss << "500 Internal Server Error\r\n"; break;
     }
 
+    bool has_content_length = false;
     for (const auto& [key, value] : headers) {
+        if (key == "Content-Length") has_content_length = true;
         oss << key << ": " << value << "\r\n";
     }
+
+    if (!has_content_length && !body.empty()) {
+        oss << "Content-Length: " << body.length() << "\r\n";
+    }
+
     oss << "\r\n";
     return oss.str();
 }

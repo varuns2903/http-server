@@ -1,47 +1,36 @@
 #include "EventLoop.hpp"
 #include "../utils/Logger.hpp"
+#include "../network/EpollProactor.hpp"
+#include "../network/IoUringProactor.hpp"
 #include <iostream>
+#include <arpa/inet.h>
 
 namespace server {
 
 EventLoop::EventLoop(Listener& listener, const routing::Router& router, const config::ServerConfig& config, network::TlsContext* tls_context)
-    : listener_(listener), thread_pool_(config.worker_threads), connection_manager_(epoll_, router, thread_pool_, timer_manager_, config.max_body_size, tls_context) {
+    : listener_(listener), 
+      proactor_(config.engine == config::EventEngine::Epoll ? 
+               static_cast<std::unique_ptr<network::Proactor>>(std::make_unique<network::EpollProactor>()) : 
+               static_cast<std::unique_ptr<network::Proactor>>(std::make_unique<network::IoUringProactor>())),
+      thread_pool_(config.worker_threads), 
+      connection_manager_(*proactor_, router, thread_pool_, timer_manager_, config.max_body_size, tls_context) {
     
-    // Tell epoll to watch the listener socket for incoming connections (EPOLLIN)
-    epoll_.add(listener_.fd(), EPOLLIN);
+    do_accept();
 }
 
 void EventLoop::run() {
-    std::vector<epoll_event> events(64);
-
     LOG_INFO("Event loop started with ConnectionManager (HTTP Keep-Alive enabled)!");
 
     while (is_running_) {
-        int timeout = timer_manager_.get_next_timeout();
-        int num_ready = epoll_.wait(events, timeout);
+        try {
+            proactor_->run_once(timer_manager_.get_next_timeout());
 
-        for (size_t i = 0; i < static_cast<size_t>(num_ready); ++i) {
-            int fd = events[i].data.fd;
-            uint32_t ev = events[i].events;
-
-            if (fd == listener_.fd()) {
-                if (ev & EPOLLIN) {
-                    handle_new_connections();
-                }
-            } else {
-                if (ev & EPOLLIN) {
-                    connection_manager_.handle_read(fd);
-                }
-                if (ev & EPOLLOUT) {
-                    connection_manager_.handle_write(fd);
-                }
-            }
+            timer_manager_.handle_expired_timers([this](int fd) {
+                connection_manager_.remove_connection(fd);
+            });
+        } catch (const std::exception& e) {
+            LOG_ERROR("Error in event loop: " + std::string(e.what()));
         }
-
-        // Process any connections that have timed out
-        timer_manager_.handle_expired_timers([this](int fd) {
-            connection_manager_.remove_connection(fd);
-        });
     }
     
     LOG_INFO("Event loop stopped. Shutting down...");
@@ -51,19 +40,21 @@ void EventLoop::stop() {
     is_running_ = false;
 }
 
-void EventLoop::handle_new_connections() {
-    while (true) {
-        auto client_opt = listener_.accept_connection();
-        if (!client_opt) {
-            break; // EAGAIN, we've accepted all currently waiting clients
+void EventLoop::do_accept() {
+    proactor_->async_accept(listener_.fd(), [this](int client_fd, sockaddr_in addr) {
+        if (client_fd >= 0) {
+            std::cout << "Accepted new connection! FD: " << client_fd << std::endl;
+            std::string client_ip = inet_ntoa(addr.sin_addr);
+            network::Socket client(client_fd);
+            connection_manager_.add_connection(std::move(client), client_ip);
+        } else {
+            LOG_ERROR("Accept failed");
         }
-
-        network::Socket client = std::move(*client_opt);
-        client.set_non_blocking();
         
-        // Pass ownership of the new socket to the ConnectionManager
-        connection_manager_.add_connection(std::move(client));
-    }
+        if (is_running_) {
+            do_accept();
+        }
+    });
 }
 
 } // namespace server

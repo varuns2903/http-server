@@ -16,6 +16,8 @@ struct HttpRequest {
     std::unordered_map<std::string_view, std::string_view> headers;
     std::string_view body;
     std::unordered_map<std::string, std::string> params;
+    std::string client_ip;
+    std::string session_id; // Set by SessionManager middleware
 
     nlohmann::json json() const {
         if (body.empty()) return nlohmann::json::object();

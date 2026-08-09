@@ -19,7 +19,7 @@ routing::Middleware cors(CorsOptions options) {
     std::string methods_str = join(options.allowed_methods, ", ");
     std::string headers_str = join(options.allowed_headers, ", ");
     
-    return [options, methods_str, headers_str](http::HttpRequest& request, http::HttpResponse& response) -> bool {
+    return [options, methods_str, headers_str](http::HttpRequest& request, std::shared_ptr<http::ResponseWriter> writer) -> bool {
         
         // 1. Calculate Origin
         std::string origin = "*";
@@ -39,18 +39,20 @@ routing::Middleware cors(CorsOptions options) {
         }
         
         // 2. Attach standard headers to every response
-        response.headers["Access-Control-Allow-Origin"] = origin;
+        writer->set_header("Access-Control-Allow-Origin", origin);
         if (options.allow_credentials) {
-            response.headers["Access-Control-Allow-Credentials"] = "true";
+            writer->set_header("Access-Control-Allow-Credentials", "true");
         }
 
         // 3. Handle OPTIONS preflight intercept
         if (request.method == http::HttpMethod::OPTIONS) {
-            response.headers["Access-Control-Allow-Methods"] = methods_str;
-            response.headers["Access-Control-Allow-Headers"] = headers_str;
-            response.headers["Access-Control-Max-Age"] = "86400"; // Cache for 24 hours
+            http::HttpResponse res;
+            res.headers["Access-Control-Allow-Methods"] = methods_str;
+            res.headers["Access-Control-Allow-Headers"] = headers_str;
+            res.headers["Access-Control-Max-Age"] = "86400"; // Cache for 24 hours
             
-            response.status(http::HttpStatus::NoContent).send("");
+            res.status(http::HttpStatus::NoContent).send("");
+            writer->send(std::move(res));
             return false; // Intercepted, stop pipeline
         }
 

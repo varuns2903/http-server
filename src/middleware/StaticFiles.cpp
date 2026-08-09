@@ -5,7 +5,7 @@
 namespace middleware {
 
 routing::Middleware static_files(const std::string& directory) {
-    return [directory](http::HttpRequest& request, http::HttpResponse& response) -> bool {
+    return [directory](http::HttpRequest& request, std::shared_ptr<http::ResponseWriter> writer) -> bool {
         if (request.method != http::HttpMethod::GET) {
             return true; // Continue pipeline, only GET requests are served statically
         }
@@ -36,12 +36,16 @@ routing::Middleware static_files(const std::string& directory) {
                     else if (ext == ".jpg" || ext == ".jpeg") mime = "image/jpeg";
                     else if (ext == ".txt") mime = "text/plain";
                     
-                    response.send_file(req_str, mime);
+                    http::HttpResponse res;
+                    res.send_file(req_str, mime);
+                    writer->send(std::move(res));
                     return false; // File served, stop pipeline!
                 }
             } else {
                 LOG_WARN("Path traversal attack blocked! Attempted to access: " << request.uri);
-                response.status(http::HttpStatus::Forbidden).send("403 Forbidden");
+                http::HttpResponse res;
+                res.status(http::HttpStatus::Forbidden).send("403 Forbidden");
+                writer->send(std::move(res));
                 return false; // Handled as error, stop pipeline!
             }
         } catch (const std::exception& e) {

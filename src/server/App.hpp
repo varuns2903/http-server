@@ -21,6 +21,12 @@ public:
     // Middleware
     App& use(routing::Middleware m);
 
+    // Route Grouping
+    App& group(const std::string& prefix, std::function<void(routing::Router&)> callback) {
+        router_.group(prefix, std::move(callback));
+        return *this;
+    }
+
     // Fluent routing API
     App& get(const std::string& path, routing::RouteHandler handler);
     App& post(const std::string& path, routing::RouteHandler handler);

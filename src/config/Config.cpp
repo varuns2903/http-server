@@ -17,6 +17,7 @@ ServerConfig ServerConfig::parse(int argc, char* argv[]) {
         {"max-body-size", required_argument, nullptr, 'm'},
         {"ssl-cert", required_argument, nullptr, 'c'},
         {"ssl-key", required_argument, nullptr, 'k'},
+        {"engine", required_argument, nullptr, 'e'},
         {"help", no_argument, nullptr, 'h'},
         {nullptr, no_argument, nullptr, 0}
     };
@@ -47,6 +48,18 @@ ServerConfig ServerConfig::parse(int argc, char* argv[]) {
             case 'k':
                 cfg.ssl_key = optarg;
                 break;
+            case 'e': {
+                std::string engine_str = optarg;
+                if (engine_str == "epoll") {
+                    cfg.engine = EventEngine::Epoll;
+                } else if (engine_str == "iouring") {
+                    cfg.engine = EventEngine::IoUring;
+                } else {
+                    std::cerr << "Invalid engine: " << engine_str << ". Must be 'epoll' or 'iouring'\n";
+                    std::exit(1);
+                }
+                break;
+            }
             case 'h':
             case '?':
             default:
@@ -58,6 +71,7 @@ ServerConfig ServerConfig::parse(int argc, char* argv[]) {
                           << "  -m, --max-body-size <bytes> Maximum HTTP request body size (default: 10485760 (10MB))\n"
                           << "  -c, --ssl-cert <file>       Path to SSL/TLS certificate file\n"
                           << "  -k, --ssl-key <file>        Path to SSL/TLS private key file\n"
+                          << "  -e, --engine <engine>       Event backend: 'epoll' or 'iouring' (default: iouring)\n"
                           << "  -h, --help                  Show this help message\n";
                 std::exit(0);
         }

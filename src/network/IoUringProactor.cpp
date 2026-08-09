@@ -1,0 +1,176 @@
+#include "IoUringProactor.hpp"
+#include <stdexcept>
+#include <iostream>
+#include <sys/socket.h>
+
+namespace network {
+
+IoUringProactor::IoUringProactor(unsigned entries) {
+    if (io_uring_queue_init(entries, &ring_, 0) < 0) {
+        throw std::runtime_error("Failed to initialize io_uring");
+    }
+}
+
+IoUringProactor::~IoUringProactor() {
+    io_uring_queue_exit(&ring_);
+}
+
+struct io_uring_sqe* IoUringProactor::get_sqe_safe() {
+    struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+    if (!sqe) {
+        io_uring_submit(&ring_);
+        sqe = io_uring_get_sqe(&ring_);
+    }
+    return sqe;
+}
+
+void IoUringProactor::async_read(int fd, void* buffer, size_t size, std::function<void(ssize_t)> callback) {
+    auto* ctx = new IoContext();
+    ctx->type = OpType::READ;
+    ctx->fd = fd;
+    ctx->io_cb = std::move(callback);
+
+    std::lock_guard<std::mutex> lock(sq_mutex_);
+    struct io_uring_sqe* sqe = get_sqe_safe();
+    if (sqe) {
+        io_uring_prep_recv(sqe, fd, buffer, size, 0);
+        io_uring_sqe_set_data(sqe, ctx);
+        io_uring_sqe_set_flags(sqe, IOSQE_ASYNC);
+        io_uring_submit(&ring_);
+    } else {
+        delete ctx;
+    }
+}
+
+void IoUringProactor::async_write(int fd, const void* buffer, size_t size, std::function<void(ssize_t)> callback) {
+    auto* ctx = new IoContext();
+    ctx->type = OpType::WRITE;
+    ctx->fd = fd;
+    ctx->io_cb = std::move(callback);
+
+    std::lock_guard<std::mutex> lock(sq_mutex_);
+    struct io_uring_sqe* sqe = get_sqe_safe();
+    if (sqe) {
+        io_uring_prep_send(sqe, fd, buffer, size, 0);
+        io_uring_sqe_set_data(sqe, ctx);
+        io_uring_sqe_set_flags(sqe, IOSQE_ASYNC);
+        io_uring_submit(&ring_);
+    } else {
+        delete ctx;
+    }
+}
+
+void IoUringProactor::async_sendfile(int out_fd, int in_fd, off_t offset, size_t count, std::function<void(ssize_t)> callback) {
+    // Note: io_uring doesn't have prep_sendfile natively in all kernels, but we can use IORING_OP_SPLICE
+    // For now, to keep it simple and compatible, we can emulate it, or use io_uring_prep_splice if available.
+    // However, IORING_OP_SPLICE is complex.
+    // If not available, we can just execute sendfile on the event loop like EpollProactor does.
+    // Actually, we can use io_uring_prep_splice(sqe, in_fd, offset, out_fd, -1, count, 0);
+    auto* ctx = new IoContext();
+    ctx->type = OpType::SENDFILE;
+    ctx->fd = out_fd;
+    ctx->io_cb = std::move(callback);
+
+    std::lock_guard<std::mutex> lock(sq_mutex_);
+    struct io_uring_sqe* sqe = get_sqe_safe();
+    if (sqe) {
+        // splice from in_fd to out_fd
+        io_uring_prep_splice(sqe, in_fd, offset, out_fd, -1, count, 0);
+        io_uring_sqe_set_data(sqe, ctx);
+        io_uring_submit(&ring_);
+    } else {
+        delete ctx;
+    }
+}
+
+void IoUringProactor::async_accept(int fd, std::function<void(int, sockaddr_in)> callback) {
+    auto* ctx = new IoContext();
+    ctx->type = OpType::ACCEPT;
+    ctx->fd = fd;
+    ctx->accept_cb = std::move(callback);
+
+    std::lock_guard<std::mutex> lock(sq_mutex_);
+    struct io_uring_sqe* sqe = get_sqe_safe();
+    if (sqe) {
+        io_uring_prep_accept(sqe, fd, (struct sockaddr*)&ctx->client_addr, &ctx->client_len, SOCK_CLOEXEC);
+        io_uring_sqe_set_data(sqe, ctx);
+        io_uring_sqe_set_flags(sqe, IOSQE_ASYNC);
+        io_uring_submit(&ring_);
+    } else {
+        delete ctx;
+    }
+}
+
+void IoUringProactor::async_connect(int fd, const sockaddr_in& addr, std::function<void(int)> callback) {
+    auto* ctx = new IoContext();
+    ctx->type = OpType::CONNECT;
+    ctx->fd = fd;
+    ctx->client_addr = addr;
+    ctx->client_len = sizeof(addr);
+    ctx->connect_cb = std::move(callback);
+
+    std::lock_guard<std::mutex> lock(sq_mutex_);
+    struct io_uring_sqe* sqe = get_sqe_safe();
+    if (sqe) {
+        io_uring_prep_connect(sqe, fd, (struct sockaddr*)&ctx->client_addr, ctx->client_len);
+        io_uring_sqe_set_data(sqe, ctx);
+        io_uring_submit(&ring_);
+    } else {
+        delete ctx;
+    }
+}
+
+void IoUringProactor::remove(int fd) {
+    // When the socket is closed, the kernel automatically cancels pending requests on it.
+    // We can also explicitly submit a cancel request if desired.
+    std::lock_guard<std::mutex> lock(sq_mutex_);
+    struct io_uring_sqe* sqe = get_sqe_safe();
+    if (sqe) {
+        io_uring_prep_cancel_fd(sqe, fd, IORING_ASYNC_CANCEL_ALL);
+        io_uring_sqe_set_data(sqe, nullptr); // no context needed for cancel cqe itself
+        io_uring_submit(&ring_);
+    }
+}
+
+void IoUringProactor::run_once(int timeout_ms) {
+    struct __kernel_timespec ts;
+    ts.tv_sec = timeout_ms / 1000;
+    ts.tv_nsec = (timeout_ms % 1000) * 1000000;
+
+    struct io_uring_cqe* cqe;
+    
+    // We don't hold the mutex here because io_uring_wait_cqe_timeout modifies CQ and doesn't conflict with SQ
+    int ret = io_uring_wait_cqe_timeout(&ring_, &cqe, &ts);
+    if (ret < 0) {
+        if (ret == -ETIME || ret == -EINTR || ret == -EAGAIN) return;
+        throw std::runtime_error("io_uring_wait_cqe_timeout failed");
+    }
+
+    // Process all available CQEs
+    unsigned head;
+    unsigned count = 0;
+    io_uring_for_each_cqe(&ring_, head, cqe) {
+        count++;
+        IoContext* ctx = static_cast<IoContext*>(io_uring_cqe_get_data(cqe));
+        if (ctx) {
+            if (cqe->res != -ECANCELED) {
+                if (ctx->type == OpType::ACCEPT) {
+                    if (cqe->res >= 0) {
+                        ctx->accept_cb(cqe->res, ctx->client_addr);
+                    } else if (cqe->res != -EAGAIN) {
+                        ctx->accept_cb(-1, ctx->client_addr);
+                    }
+                } else if (ctx->type == OpType::CONNECT) {
+                    ctx->connect_cb(cqe->res);
+                } else {
+                    ctx->io_cb(cqe->res);
+                }
+            }
+            delete ctx;
+        }
+    }
+
+    io_uring_cq_advance(&ring_, count);
+}
+
+} // namespace network

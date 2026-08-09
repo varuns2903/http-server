@@ -45,32 +45,63 @@ WsHandler Router::get_ws_route(const std::string& path) const {
     return nullptr;
 }
 
+void Router::group(const std::string& prefix, std::function<void(Router&)> callback) {
+    Router group_router(prefix, this);
+    callback(group_router);
+}
+
 void Router::add_route(http::HttpMethod method, const std::string& path, RouteHandler handler) {
-    if (path.find(':') != std::string::npos || path.find('*') != std::string::npos) {
+    std::string full_path = prefix_ + path;
+    
+    RouteHandler wrapped = handler;
+    if (!local_middlewares_.empty()) {
+        wrapped = [mws = local_middlewares_, h = std::move(handler)](http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> w) {
+            for (auto& mw : mws) {
+                if (!mw(req, w)) return;
+            }
+            h(req, w);
+        };
+    }
+
+    if (parent_) {
+        parent_->add_route(method, full_path, std::move(wrapped));
+        return;
+    }
+
+    if (full_path.find(':') != std::string::npos || full_path.find('*') != std::string::npos) {
         DynamicRoute dr;
         dr.method = method;
-        dr.path_segments = split_path(path);
-        dr.handler = std::move(handler);
+        dr.path_segments = split_path(full_path);
+        dr.handler = std::move(wrapped);
         dynamic_routes_.push_back(std::move(dr));
     } else {
-        std::string key = make_route_key(method, path);
-        routes_[key] = std::move(handler);
+        std::string key = make_route_key(method, full_path);
+        routes_[key] = std::move(wrapped);
     }
 }
 
 void Router::ws(const std::string& path, WsHandler handler) {
-    ws_routes_[path] = std::move(handler);
+    std::string full_path = prefix_ + path;
+    if (parent_) {
+        parent_->ws(full_path, std::move(handler));
+    } else {
+        ws_routes_[full_path] = std::move(handler);
+    }
 }
 
 void Router::use(Middleware m) {
-    middlewares_.push_back(std::move(m));
+    if (parent_) {
+        local_middlewares_.push_back(std::move(m));
+    } else {
+        middlewares_.push_back(std::move(m));
+    }
 }
 
-void Router::route(http::HttpRequest& request, http::HttpResponse& response) const {
+void Router::route(http::HttpRequest& request, std::shared_ptr<http::ResponseWriter> response_writer) const {
     try {
         // 1. Run global and route-specific middlewares
         for (auto& mw : middlewares_) {
-            if (!mw(request, response)) {
+            if (!mw(request, response_writer)) {
                 return; // Pipeline stopped by middleware (e.g., auth failed, file served)
             }
         }
@@ -80,7 +111,7 @@ void Router::route(http::HttpRequest& request, http::HttpResponse& response) con
         // 2. Exact match check
         auto it = routes_.find(route_key);
         if (it != routes_.end()) {
-            it->second(request, response);
+            it->second(request, response_writer);
             return;
         }
         
@@ -108,22 +139,28 @@ void Router::route(http::HttpRequest& request, http::HttpResponse& response) con
             
             if (matches) {
                 request.params = std::move(extracted_params);
-                dr.handler(request, response);
+                dr.handler(request, response_writer);
                 return;
             }
         }
         
         // 4. If no route matches, return a 404 Not Found
-        response.status(http::HttpStatus::NotFound).send("404 Not Found");
+        http::HttpResponse res;
+        res.status(http::HttpStatus::NotFound).send("404 Not Found");
+        response_writer->send(std::move(res));
         
     } catch (const std::exception& e) {
         LOG_ERROR("Unhandled exception in route " << request.uri << ": " << e.what());
-        response.status(http::HttpStatus::InternalServerError).send(
+        http::HttpResponse res;
+        res.status(http::HttpStatus::InternalServerError).send(
             "500 Internal Server Error: " + std::string(e.what())
         );
+        response_writer->send(std::move(res));
     } catch (...) {
         LOG_ERROR("Unknown unhandled exception in route " << request.uri);
-        response.status(http::HttpStatus::InternalServerError).send("500 Internal Server Error");
+        http::HttpResponse res;
+        res.status(http::HttpStatus::InternalServerError).send("500 Internal Server Error");
+        response_writer->send(std::move(res));
     }
 }
 

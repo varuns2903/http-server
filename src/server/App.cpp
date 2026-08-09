@@ -1,7 +1,18 @@
 #include "App.hpp"
 #include "../utils/Logger.hpp"
+#include <csignal>
+#include <cstring>
 
 namespace server {
+
+static App* g_app = nullptr;
+
+void signal_handler(int signum) {
+    if (g_app) {
+        LOG_INFO("Interrupt signal (" << signum << ") received. Stopping server gracefully...");
+        g_app->stop();
+    }
+}
 
 App::App(const config::ServerConfig& config) : config_(config) {
     utils::Logger::init(config.log_level);
@@ -50,6 +61,14 @@ App& App::options(const std::string& path, routing::RouteHandler handler) {
 }
 
 void App::listen() {
+    g_app = this;
+    
+    struct sigaction action;
+    std::memset(&action, 0, sizeof(action));
+    action.sa_handler = signal_handler;
+    sigaction(SIGINT, &action, nullptr);
+    sigaction(SIGTERM, &action, nullptr);
+
     listener_ = std::make_unique<Listener>(config_.port);
     listener_->start();
     

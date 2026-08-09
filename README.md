@@ -1,105 +1,103 @@
-# Orbit: High-Performance C++ Web Framework 🚀
+# 🚀 Orbit HTTP Server
 
-**Orbit** is an ultra-fast, lightweight, and modern C++ web framework built from the ground up for Linux. Powered by `epoll` and `sendfile(2)`, it serves raw performance without compromising on developer experience.
+<p align="center">
+  <img src="https://img.shields.io/badge/C%2B%2B-20-blue.svg?style=flat-square" alt="C++20">
+  <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License">
+  <img src="https://img.shields.io/badge/Engine-io__uring%20%7C%20epoll-orange.svg?style=flat-square" alt="Engine">
+  <img src="https://img.shields.io/badge/Status-Active-brightgreen.svg?style=flat-square" alt="Status">
+</p>
+
+> A blazing fast, asynchronous, and middleware-driven C++20 HTTP/WebSocket web framework powered by `io_uring` and `epoll`.
+
+---
 
 ## ✨ Features
 
-- **Blazing Fast Concurrency**: Built on a non-blocking Linux `epoll` Event Loop combined with a thread pool.
-- **Express-like Routing**: Register routes effortlessly using modern C++ lambdas.
-- **Dynamic Path Parameters**: Seamlessly parse dynamic variables (`/users/:id`).
-- **Middleware Pipeline**: Inject powerful request interceptors (e.g., authentication, logging) globally or per-route.
-- **Native JSON Support**: Powered by `nlohmann/json`, reading and writing JSON bodies is natively supported.
-- **Zero-Copy File Serving**: `sendfile(2)` static file serving out of the box via middleware.
-- **Security First**: Built-in path traversal attack prevention.
-- **Modern C++20**: Zero dependencies (except for GoogleTest for testing) and designed beautifully.
+- ⚡ **Asynchronous Core**: Pluggable event loop engine supporting both modern `io_uring` and legacy `epoll` for maximum throughput and kernel-level asynchronous I/O.
+- 🛣️ **Express-style Routing**: Dynamic routing, URL parameter extraction, and route groupings.
+- 🔌 **WebSocket Support**: Full RFC-compliant WebSocket integration seamlessly built-in.
+- 🔒 **TLS/SSL Encryption**: Built-in OpenSSL-based HTTPS proxying and secure traffic handling.
+- 🛡️ **Robust Middlewares**: Composable middleware stack including:
+  - Global Rate Limiting
+  - Redis-backed Distributed Session Management
+  - CORS Headers Support
+  - Static File Serving (with zero-copy `sendfile`)
+- 🧪 **E2E Testing & Benchmarking**: Dedicated testing suite and automated performance benchmarks using Apache Benchmark.
+- 🧵 **Multi-threaded Worker Pool**: Efficiently utilizes CPU cores to process requests concurrently without blocking the event loop.
 
-## 📦 Installation
+## 🛠️ Architecture
 
-Orbit is a standard CMake project. You can build and install it globally on your system.
-
-```bash
-git clone https://github.com/varuns2903/http-server.git
-cd http-server
-mkdir build && cd build
-cmake ..
-make -j$(nproc)
-sudo make install
-```
-
-Once installed, you can include Orbit in your own CMake projects:
-
-```cmake
-find_package(HttpServer REQUIRED)
-
-add_executable(my_app main.cpp)
-target_link_libraries(my_app HttpServer::core)
-```
+Orbit is designed around a scalable Proactor pattern:
+- **Event Loop**: Listens for socket readiness using `io_uring` (or `epoll`).
+- **Connection Manager**: Handles socket lifecycles and HTTP Keep-Alive.
+- **Thread Pool**: Offloads request parsing, middleware execution, and route handling to worker threads.
+- **Router**: Resolves endpoints with `O(1)` or `O(log N)` complexity.
 
 ## 🚀 Quick Start
 
-Here is how simple it is to get a web server running with Orbit:
+### Prerequisites
+- GCC 11+ or Clang 13+ (C++20 support required)
+- CMake 3.15+
+- Linux Kernel 5.6+ (for `io_uring` support)
+- OpenSSL
+- Hiredis
+- `liburing`
+
+### Build
+
+```bash
+mkdir -p build && cd build
+cmake -DCMAKE_BUILD_TYPE=Release ..
+make -j$(nproc)
+```
+
+### Run the Basic Server
+```bash
+./build/basic_server --port 3000 --engine io_uring
+```
+
+## 📖 Usage Example
 
 ```cpp
-#include <http-server/server/App.hpp>
-#include <http-server/config/Config.hpp>
-#include <http-server/middleware/StaticFiles.hpp>
-#include <iostream>
+#include "server/App.hpp"
+#include "routing/Router.hpp"
 
-int main(int argc, char* argv[]) {
-    // 1. Initialize configuration
-    auto config = config::ServerConfig::parse(argc, argv);
-    server::App app(config);
+int main() {
+    server::App app;
 
-    // 2. Global Middleware (e.g. Logging)
-    app.use([](http::HttpRequest& req, http::HttpResponse& res) {
-        std::cout << "[Middleware] " << req.uri << std::endl;
-        return true; // Continue pipeline
+    // Apply Global Middleware
+    app.use(middleware::cors());
+    app.use(middleware::rate_limit(100, std::chrono::seconds(10)));
+
+    // Create Route Group
+    auto api = app.group("/api/v1");
+
+    // Dynamic Route
+    api->get("/users/:id", [](http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> res) {
+        std::string id = req.params["id"];
+        res->send(http::HttpResponse{http::HttpStatus::OK, "User ID: " + id});
     });
 
-    // 3. Static File Server
-    app.use(middleware::static_files("./public"));
-
-    // 4. API Routes
-    app.get("/", [](const http::HttpRequest& req, http::HttpResponse& res) {
-        res.html("<h1>Welcome to Orbit!</h1>");
-    })
-    .get("/users/:id", [](const http::HttpRequest& req, http::HttpResponse& res) {
-        std::string user_id = req.params.at("id");
-        res.json({
-            {"user_id", user_id},
-            {"status", "active"}
-        });
-    })
-    .post("/echo", [](const http::HttpRequest& req, http::HttpResponse& res) {
-        auto payload = req.json(); // Parses body into nlohmann::json
-        payload["received"] = true;
-        res.json(payload);
+    app.listen(3000, []() {
+        std::cout << "Server listening on port 3000!" << std::endl;
     });
 
-    // 5. Blast off!
-    app.listen();
     return 0;
 }
 ```
 
-## 🛠️ Architecture
+## 🧪 Testing and Benchmarking
 
-Orbit strictly decouples its networking architecture from its routing layer:
-- `server::App`: The developer-facing frontend wrapper.
-- `routing::Router`: Core URL parsing, parameter extraction, and middleware execution.
-- `server::EventLoop`: The heart of the network. A non-blocking `epoll` reactor handling thousands of connections.
-- `concurrency::ThreadPool`: Worker threads that dequeue HTTP parsing and route execution to keep the EventLoop blazing fast.
-- `server::TimerManager`: Background thread ensuring Keep-Alive connections are safely swept and closed when idle.
-
-## 🧪 Running Tests
-
-Orbit comes with a comprehensive suite of tests powered by `GoogleTest`.
+Run the end-to-end integration test suite:
 ```bash
-mkdir build && cd build
-cmake ..
-make -j$(nproc)
-ctest --output-on-failure
+make e2e-test
 ```
 
----
-*Built with ❤️ in C++20 for high-performance systems.*
+Run Apache Benchmark performance tests:
+```bash
+make benchmark
+```
+
+## 📜 License
+
+Distributed under the MIT License.
