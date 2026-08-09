@@ -100,7 +100,12 @@ void Connection::handle_read() {
         }
     }
 
-    // Now, check if we have a full request buffered
+    if (state_ == ConnectionState::WEBSOCKET) {
+        // TODO: Offload to WebSocket frame parser thread
+        return;
+    }
+
+    // Now, check if we have a full HTTP request buffered
     if (!is_request_complete()) {
         // We hit EAGAIN but don't have a full request. We must re-arm EPOLLONESHOT!
         epoll_.modify(socket_.fd(), EPOLLIN | EPOLLONESHOT);

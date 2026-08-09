@@ -12,6 +12,11 @@ namespace server {
 
 class ConnectionManager; // Forward declaration
 
+enum class ConnectionState {
+    HTTP,
+    WEBSOCKET
+};
+
 class Connection {
 public:
     Connection(network::Socket socket, network::Epoll& epoll, const routing::Router& router, ConnectionManager& manager, concurrency::ThreadPool& thread_pool, TimerManager& timer_manager, size_t max_body_size, network::TlsContext* tls_context = nullptr);
@@ -40,6 +45,7 @@ private:
 
     bool is_request_complete() const;
     bool should_close_{false};
+    ConnectionState state_{ConnectionState::HTTP};
     uint64_t current_timer_id_{0};
     
     int file_fd_{-1};
