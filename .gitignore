@@ -3,3 +3,6 @@ build/
 compile_commands.json
 .DS_Store
 *.log
+*.pem
+*.key
+*.crt
