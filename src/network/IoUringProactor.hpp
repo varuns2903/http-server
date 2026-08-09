@@ -43,6 +43,11 @@ private:
         
         sockaddr_in client_addr{};
         socklen_t client_len{sizeof(sockaddr_in)};
+
+        // For sendfile fallback
+        int in_fd{-1};
+        off_t offset{0};
+        size_t count{0};
     };
 
     struct io_uring_sqe* get_sqe_safe();

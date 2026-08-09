@@ -2,6 +2,8 @@
 #include <stdexcept>
 #include <iostream>
 #include <sys/socket.h>
+#include <sys/sendfile.h>
+#include <poll.h>
 
 namespace network {
 
@@ -61,21 +63,20 @@ void IoUringProactor::async_write(int fd, const void* buffer, size_t size, std::
 }
 
 void IoUringProactor::async_sendfile(int out_fd, int in_fd, off_t offset, size_t count, std::function<void(ssize_t)> callback) {
-    // Note: io_uring doesn't have prep_sendfile natively in all kernels, but we can use IORING_OP_SPLICE
-    // For now, to keep it simple and compatible, we can emulate it, or use io_uring_prep_splice if available.
-    // However, IORING_OP_SPLICE is complex.
-    // If not available, we can just execute sendfile on the event loop like EpollProactor does.
-    // Actually, we can use io_uring_prep_splice(sqe, in_fd, offset, out_fd, -1, count, 0);
     auto* ctx = new IoContext();
     ctx->type = OpType::SENDFILE;
     ctx->fd = out_fd;
+    ctx->in_fd = in_fd;
+    ctx->offset = offset;
+    ctx->count = count;
     ctx->io_cb = std::move(callback);
 
     std::lock_guard<std::mutex> lock(sq_mutex_);
     struct io_uring_sqe* sqe = get_sqe_safe();
     if (sqe) {
-        // splice from in_fd to out_fd
-        io_uring_prep_splice(sqe, in_fd, offset, out_fd, -1, count, 0);
+        // Splice from regular file to TCP socket directly is illegal (fails with -EINVAL).
+        // Instead, we use POLLOUT to wait for socket writability, then call sendfile().
+        io_uring_prep_poll_add(sqe, out_fd, POLLOUT);
         io_uring_sqe_set_data(sqe, ctx);
         io_uring_submit(&ring_);
     } else {
@@ -162,6 +163,13 @@ void IoUringProactor::run_once(int timeout_ms) {
                     }
                 } else if (ctx->type == OpType::CONNECT) {
                     ctx->connect_cb(cqe->res);
+                } else if (ctx->type == OpType::SENDFILE) {
+                    if (cqe->res > 0 && (cqe->res & POLLOUT)) {
+                        ssize_t bytes = sendfile(ctx->fd, ctx->in_fd, &ctx->offset, ctx->count);
+                        ctx->io_cb(bytes);
+                    } else {
+                        ctx->io_cb(-1);
+                    }
                 } else {
                     ctx->io_cb(cqe->res);
                 }
