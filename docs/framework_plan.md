@@ -39,7 +39,7 @@ To be a true framework, developers need to be able to easily link against it.
     *   Evaluate if a header-only library is viable for easier distribution, though linking a pre-compiled library is faster for user compile times.
 
 ## Phase 4: Utilities & Developer Experience (DX) [PARTIALLY COMPLETED]
-*   **4.1 Native JSON Support** [PENDING]
+*   **4.1 Native JSON Support** [COMPLETED]
     *   Integrate a fast JSON library (like `nlohmann/json` or `simdjson`) as a dependency, allowing users to easily parse request bodies and serialize responses.
 *   **4.2 Built-in Static File Server** [COMPLETED]
     *   Wrap the existing `sendfile` zero-copy implementation into a middleware: `app.use("/public", static_folder("./public"))`.

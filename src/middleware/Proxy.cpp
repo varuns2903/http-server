@@ -230,6 +230,9 @@ private:
                     self->process_cleartext(self->read_buf_, bytes);
                 }
             } else {
+                if (self->is_websocket_) {
+                    return; // Upstream closed the websocket
+                }
                 // Done reading!
                 if (!self->headers_sent_) {
                     self->send_accumulated_response(); // Fallback if it closed before headers finished
@@ -277,9 +280,13 @@ private:
             }
         } else {
             std::string_view chunk(data, len);
-            writer_->write_chunk(chunk);
-            body_bytes_read_ += len;
-            check_completion();
+            if (is_websocket_) {
+                writer_->write_chunk(chunk); // write_chunk still works to send raw data in our implementation
+            } else {
+                writer_->write_chunk(chunk);
+                body_bytes_read_ += len;
+                check_completion();
+            }
         }
     }
 
@@ -335,7 +342,36 @@ private:
             pos = next;
         }
         
+        
         writer_->send_headers(res);
+
+        if (res.status_code == http::HttpStatus::SwitchingProtocols) {
+            is_websocket_ = true;
+            auto self = shared_from_this();
+            writer_->upgrade_to_raw_stream(
+                [self](std::string_view data) {
+                    if (self->is_https_) {
+                        SSL_write(self->ssl_, data.data(), data.size());
+                        self->flush_tls_writes(nullptr);
+                    } else {
+                        // We must copy data to a stable buffer for async_write
+                        // This is a naive implementation for demonstration
+                        std::vector<char>* buf = new std::vector<char>(data.begin(), data.end());
+                        self->proactor_.async_write(self->fd_, buf->data(), buf->size(), [buf](ssize_t) {
+                            delete buf;
+                        });
+                    }
+                },
+                [self]() {
+                    if (self->fd_ != -1) {
+                        self->proactor_.remove(self->fd_);
+                        close(self->fd_);
+                        self->fd_ = -1;
+                    }
+                }
+            );
+            read_loop();
+        }
     }
 
     void send_accumulated_response() {
@@ -366,6 +402,7 @@ private:
     bool headers_sent_{false};
     bool is_reused_{false};
     bool is_keep_alive_eligible_{false};
+    bool is_websocket_{false};
     size_t content_length_{0};
     size_t body_bytes_read_{0};
 };

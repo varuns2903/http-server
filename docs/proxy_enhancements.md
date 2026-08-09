@@ -14,14 +14,14 @@ While the foundation of the asynchronous reverse proxy is fully functional and s
 **Issue:** For every proxied request, the gateway opens a brand new TCP connection to the upstream server and tears it down afterwards. This incurs massive latency under high load.
 **Solution:** Implement an `UpstreamConnectionPool` that maintains warm, keep-alive TCP connections to backend nodes. The proxy can simply borrow a socket, send a request, and return the socket to the pool.
 
-## 4. Upstream TLS/HTTPS Support [PENDING]
+## 4. Upstream TLS/HTTPS Support [COMPLETED]
 **Issue:** The proxy currently only connects to plain-text `http://` upstream servers via raw TCP sockets.
 **Solution:** Extend `AsyncClient` to wrap the outbound socket in an OpenSSL `BIO`/`SSL` state machine so we can securely proxy traffic to `https://` backends.
 
-## 5. WebSocket Proxying [PENDING]
+## 5. WebSocket Proxying [COMPLETED]
 **Issue:** The proxy currently drops `Upgrade: websocket` headers.
 **Solution:** Enhance the proxy state machine to recognize 101 Switching Protocols from the upstream, and seamlessly pipe bi-directional raw WebSocket frames between the client and the upstream server.
 
-## 6. Gateway Headers & Forwarding [PENDING]
+## 6. Gateway Headers & Forwarding [COMPLETED]
 **Issue:** The backend does not know the true IP of the original client.
 **Solution:** The proxy should inject standard Gateway headers (`X-Forwarded-For`, `X-Forwarded-Proto`, `X-Real-IP`, `X-Forwarded-Host`) before transmitting the request to the upstream server.

@@ -47,6 +47,8 @@ public:
     }
     
     void end() override {}
+
+    void upgrade_to_raw_stream(std::function<void(std::string_view)>, std::function<void()>) override {}
 };
 
 TEST(RouterTest, RouteMatchAndNotFound) {

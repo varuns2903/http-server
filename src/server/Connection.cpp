@@ -59,6 +59,9 @@ void Connection::trigger_read() {
 
 void Connection::on_read_complete(ssize_t bytes_read) {
     if (bytes_read <= 0) {
+        if (state_ == ConnectionState::RAW_STREAM && raw_stream_on_close_) {
+            raw_stream_on_close_();
+        }
         std::cout << "on_read_complete closed with bytes_read=" << bytes_read << std::endl;
         manager_.remove_connection(socket_.fd());
         return;
@@ -122,6 +125,16 @@ void Connection::on_read_complete(ssize_t bytes_read) {
     
     if (!tls_write_buffer_.empty()) {
         trigger_write();
+    }
+    
+    if (state_ == ConnectionState::RAW_STREAM) {
+        std::lock_guard<std::mutex> lock(read_mutex_);
+        if (!read_buffer_.empty() && raw_stream_on_data_) {
+            raw_stream_on_data_(std::string_view(read_buffer_.data(), read_buffer_.size()));
+            read_buffer_.clear();
+        }
+        trigger_read();
+        return;
     }
     
     if (state_ == ConnectionState::WEBSOCKET) {
@@ -524,8 +537,23 @@ void Connection::mark_for_close() {
 }
 
 void Connection::upgrade_to_websocket(std::unique_ptr<http::websocket::WebSocketConnection> ws_conn) {
-    ws_connection_ = std::move(ws_conn);
     state_ = ConnectionState::WEBSOCKET;
+    ws_connection_ = std::move(ws_conn);
+}
+
+void Connection::upgrade_to_raw_stream(std::function<void(std::string_view)> on_data, std::function<void()> on_close) {
+    state_ = ConnectionState::RAW_STREAM;
+    raw_stream_on_data_ = std::move(on_data);
+    raw_stream_on_close_ = std::move(on_close);
+    
+    {
+        std::lock_guard<std::mutex> lock(read_mutex_);
+        if (!read_buffer_.empty() && raw_stream_on_data_) {
+            raw_stream_on_data_(std::string_view(read_buffer_.data(), read_buffer_.size()));
+            read_buffer_.clear();
+        }
+    }
+    trigger_read();
 }
 
 RequestState Connection::check_request_state() const {

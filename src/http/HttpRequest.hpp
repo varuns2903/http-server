@@ -3,6 +3,7 @@
 #include <string_view>
 #include <unordered_map>
 #include "json.hpp"
+#include "MultipartForm.hpp"
 
 namespace http {
 
@@ -22,6 +23,14 @@ struct HttpRequest {
     nlohmann::json json() const {
         if (body.empty()) return nlohmann::json::object();
         return nlohmann::json::parse(body);
+    }
+
+    MultipartForm form() const {
+        auto ct = headers.find("Content-Type");
+        if (ct != headers.end() && ct->second.starts_with("multipart/form-data")) {
+            return MultipartForm::parse(ct->second, body);
+        }
+        return {};
     }
 };
 

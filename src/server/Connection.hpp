@@ -19,7 +19,8 @@ class ConnectionManager; // Forward declaration
 
 enum class ConnectionState {
     HTTP,
-    WEBSOCKET
+    WEBSOCKET,
+    RAW_STREAM
 };
 
 enum class RequestState {
@@ -51,6 +52,7 @@ public:
     void send_headers(http::HttpResponse& response) override;
     void write_chunk(std::string_view chunk) override;
     void end() override;
+    void upgrade_to_raw_stream(std::function<void(std::string_view)> on_data, std::function<void()> on_close) override;
 
 private:
     void process_request();
@@ -105,6 +107,8 @@ private:
     std::atomic<bool> is_processing_request_{false};
     
     std::unique_ptr<http::websocket::WebSocketConnection> ws_connection_;
+    std::function<void(std::string_view)> raw_stream_on_data_;
+    std::function<void()> raw_stream_on_close_;
 };
 
 } // namespace server
