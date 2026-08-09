@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include "json.hpp"
 #include "MultipartForm.hpp"
+#include "../utils/CaseInsensitive.hpp"
 
 namespace http {
 
@@ -14,7 +15,7 @@ struct HttpRequest {
     std::string uri;
     std::unordered_map<std::string, std::string> query;
     std::string http_version;
-    std::unordered_map<std::string_view, std::string_view> headers;
+    std::unordered_map<std::string_view, std::string_view, utils::CaseInsensitiveHash, utils::CaseInsensitiveEqual> headers;
     std::string_view body;
     std::unordered_map<std::string, std::string> params;
     std::string client_ip;

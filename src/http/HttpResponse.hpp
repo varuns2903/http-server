@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include "json.hpp"
+#include "../utils/CaseInsensitive.hpp"
 
 namespace http {
 
@@ -24,7 +25,7 @@ enum class HttpStatus {
 class HttpResponse {
 public:
     HttpStatus status_code = HttpStatus::OK;
-    std::unordered_map<std::string, std::string> headers;
+    std::unordered_map<std::string, std::string, utils::CaseInsensitiveHash, utils::CaseInsensitiveEqual> headers;
     std::string body;
     
     // Zero-copy file descriptors

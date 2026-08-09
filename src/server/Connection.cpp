@@ -579,7 +579,14 @@ RequestState Connection::check_request_state() const {
         return RequestState::ERROR_HEADERS_TOO_LARGE;
     }
     
-    size_t content_length_pos = buf_view.find("Content-Length:");
+    auto ci_find = [](std::string_view haystack, std::string_view needle) -> size_t {
+        auto it = std::search(haystack.begin(), haystack.end(), needle.begin(), needle.end(), [](char ch1, char ch2) {
+            return std::tolower(static_cast<unsigned char>(ch1)) == std::tolower(static_cast<unsigned char>(ch2));
+        });
+        return it != haystack.end() ? std::distance(haystack.begin(), it) : std::string_view::npos;
+    };
+    
+    size_t content_length_pos = ci_find(buf_view, "content-length:");
     if (content_length_pos != std::string_view::npos && content_length_pos < headers_end) {
         size_t value_start = content_length_pos + 15;
         while (value_start < headers_end && (buf_view[value_start] == ' ' || buf_view[value_start] == '	')) {

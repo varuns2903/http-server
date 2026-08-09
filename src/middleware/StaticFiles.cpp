@@ -24,7 +24,7 @@ routing::Middleware static_files(const std::string& directory) {
             std::string base_str = base_path.string();
             std::string req_str = requested_path.string();
             
-            if (req_str.find(base_str) == 0) {
+            if (req_str == base_str || req_str.find(base_str + "/") == 0) {
                 if (fs::is_regular_file(requested_path)) {
                     std::string ext = requested_path.extension().string();
                     std::string mime = "application/octet-stream";
