@@ -2,7 +2,7 @@
 
 Transforming the custom HTTP server into an easy-to-use C++ Web Framework requires decoupling the underlying `epoll` engine from the user's application logic and providing a fluent API. The goal is to allow developers to build web services in C++ with the ease of Express.js or Flask.
 
-## Phase 1: API Redesign & Decoupling
+## Phase 1: API Redesign & Decoupling [COMPLETED]
 Currently, the application is wired together in `main.cpp`. We need to hide this complexity behind a unified `Server` or `App` class.
 
 *   **1.1 Unified `App` Interface**
@@ -15,7 +15,7 @@ Currently, the application is wired together in `main.cpp`. We need to hide this
     *   Improve the `HttpResponse` class to support easy JSON serialization (e.g., `.json()`), HTML serving, and status code setters.
     *   Add query parameter parsing to `HttpRequest`.
 
-## Phase 2: Advanced Routing & Middleware
+## Phase 2: Advanced Routing & Middleware [COMPLETED]
 A modern web framework needs dynamic routing and the ability to run code before/after requests.
 
 *   **2.1 Dynamic Path Parameters**
@@ -26,7 +26,7 @@ A modern web framework needs dynamic routing and the ability to run code before/
     *   Allow functions to intercept requests for logging, authentication, or CORS headers before they hit the final route handler.
     *   Implement an `express`-like `next()` function pattern.
 
-## Phase 3: Library Packaging & Build System
+## Phase 3: Library Packaging & Build System [PENDING]
 To be a true framework, developers need to be able to easily link against it.
 
 *   **3.1 CMake Targets Restructuring**
@@ -38,15 +38,15 @@ To be a true framework, developers need to be able to easily link against it.
 *   **3.3 Header-Only Consideration (Optional)**
     *   Evaluate if a header-only library is viable for easier distribution, though linking a pre-compiled library is faster for user compile times.
 
-## Phase 4: Utilities & Developer Experience (DX)
-*   **4.1 Native JSON Support**
+## Phase 4: Utilities & Developer Experience (DX) [PARTIALLY COMPLETED]
+*   **4.1 Native JSON Support** [PENDING]
     *   Integrate a fast JSON library (like `nlohmann/json` or `simdjson`) as a dependency, allowing users to easily parse request bodies and serialize responses.
-*   **4.2 Built-in Static File Server**
+*   **4.2 Built-in Static File Server** [COMPLETED]
     *   Wrap the existing `sendfile` zero-copy implementation into a middleware: `app.use("/public", static_folder("./public"))`.
-*   **4.3 Multi-part Form Parsing**
+*   **4.3 Multi-part Form Parsing** [PENDING]
     *   Add parsing for file uploads (`multipart/form-data`).
 
-## Phase 5: Distribution & Documentation
+## Phase 5: Distribution & Documentation [PENDING]
 *   **5.1 Package Managers**
     *   Publish the framework to **vcpkg** and **Conan** so users can install it with a single command.
 *   **5.2 Example Projects**
