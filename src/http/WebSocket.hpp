@@ -17,7 +17,7 @@ public:
         
         // Base64 encode using OpenSSL EVP
         int expected_len = 4 * ((SHA_DIGEST_LENGTH + 2) / 3);
-        std::string base64_key(expected_len, '\0');
+        std::string base64_key(static_cast<size_t>(expected_len), '\0');
         
         int encoded_len = EVP_EncodeBlock(
             reinterpret_cast<unsigned char*>(&base64_key[0]),
@@ -25,7 +25,7 @@ public:
             SHA_DIGEST_LENGTH
         );
         
-        base64_key.resize(encoded_len);
+        base64_key.resize(static_cast<size_t>(encoded_len));
         return base64_key;
     }
 };
