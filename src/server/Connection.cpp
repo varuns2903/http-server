@@ -355,6 +355,8 @@ void Connection::send(http::HttpResponse&& response) {
         send_error(http::HttpStatus::PayloadTooLarge, "413 Payload Too Large");
     } else if (state == RequestState::ERROR_HEADERS_TOO_LARGE) {
         send_error(http::HttpStatus::RequestHeaderFieldsTooLarge, "431 Request Header Fields Too Large");
+    } else {
+        trigger_read();
     }
 }
 
@@ -389,6 +391,8 @@ void Connection::end() {
         send_error(http::HttpStatus::PayloadTooLarge, "413 Payload Too Large");
     } else if (state == RequestState::ERROR_HEADERS_TOO_LARGE) {
         send_error(http::HttpStatus::RequestHeaderFieldsTooLarge, "431 Request Header Fields Too Large");
+    } else {
+        trigger_read();
     }
 }
 
