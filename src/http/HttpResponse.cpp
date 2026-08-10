@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <inja/inja.hpp>
 
 namespace http {
 
@@ -38,6 +39,17 @@ void HttpResponse::set_body(const std::string& b, const std::string& content_typ
     body = b;
     headers["Content-Type"] = content_type;
     headers["Content-Length"] = std::to_string(body.length());
+}
+
+void HttpResponse::render(const std::string& template_path, const nlohmann::json& data) {
+    try {
+        inja::Environment env;
+        std::string result = env.render_file(template_path, data);
+        set_body(result, "text/html");
+    } catch (const std::exception& e) {
+        status_code = HttpStatus::InternalServerError;
+        set_body(std::string("<h1>500 Internal Server Error</h1><p>Template Error: ") + e.what() + "</p>", "text/html");
+    }
 }
 
 void HttpResponse::send_file(const std::string& path, const std::string& content_type) {

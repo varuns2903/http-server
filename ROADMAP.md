@@ -15,8 +15,8 @@ This document outlines the strategic future of the Orbit HTTP Framework. The roa
 ## Phase 2: Web Developer Ergonomics (Category 4)
 *Goal: Transition the server into a "batteries-included" web framework.*
 
-- [ ] **SSR Template Engine Integration:** Embed a modern C++ template engine (e.g., `inja`, a Jinja clone). By tying this into our native `nlohmann/json` support, developers can effortlessly render dynamic HTML pages (`<h1>{{ user.name }}</h1>`).
-- [ ] **Async PostgreSQL ORM/Client:** Link `libpq` and construct a fully asynchronous, non-blocking SQL query wrapper integrated natively with our `Epoll`/`io_uring` event loop.
+- [x] **SSR Template Engine (Inja):** Integrate a Jinja2-style template engine (`inja`) for robust server-side HTML rendering.
+- [x] **Async PostgreSQL Client:** Develop a non-blocking SQL query wrapper integrated with the reactor to allow high-throughput database interactions.
 
 ## Phase 3: Advanced Protocol Support (Category 1)
 *Goal: Stay at the bleeding edge of internet transmission standards.*

@@ -21,8 +21,8 @@ EpollProactor::~EpollProactor() {
 
 void EpollProactor::update_epoll(Context& ctx) {
     uint32_t events = 0;
-    if (ctx.reading || ctx.accepting) events |= EPOLLIN;
-    if (ctx.writing || ctx.sendfile_in_progress || ctx.connecting) events |= EPOLLOUT;
+    if (ctx.reading || ctx.accepting || ctx.waiting_read) events |= EPOLLIN;
+    if (ctx.writing || ctx.sendfile_in_progress || ctx.connecting || ctx.waiting_write) events |= EPOLLOUT;
 
     events |= EPOLLONESHOT; // Always use oneshot to prevent duplicate events on same fd
 
@@ -68,6 +68,24 @@ void EpollProactor::async_write(int fd, const void* buffer, size_t size, std::fu
     ctx.write_buf = buffer;
     ctx.write_size = size;
     ctx.write_cb = std::move(callback);
+    update_epoll(ctx);
+}
+
+void EpollProactor::async_wait_read(int fd, std::function<void()> callback) {
+    std::lock_guard<std::mutex> lock(ctx_mutex_);
+    auto& ctx = contexts_[fd];
+    ctx.fd = fd;
+    ctx.waiting_read = true;
+    ctx.wait_read_cb = std::move(callback);
+    update_epoll(ctx);
+}
+
+void EpollProactor::async_wait_write(int fd, std::function<void()> callback) {
+    std::lock_guard<std::mutex> lock(ctx_mutex_);
+    auto& ctx = contexts_[fd];
+    ctx.fd = fd;
+    ctx.waiting_write = true;
+    ctx.wait_write_cb = std::move(callback);
     update_epoll(ctx);
 }
 
@@ -167,6 +185,10 @@ void EpollProactor::run_once(int timeout_ms) {
                         ssize_t bytes = recv(fd, buf, sz, 0);
                         cb(bytes);
                     }});
+                } else if (ctx.waiting_read) {
+                    ctx.waiting_read = false;
+                    auto cb = std::move(ctx.wait_read_cb);
+                    triggers.push_back({cb});
                 }
             }
             
@@ -202,6 +224,10 @@ void EpollProactor::run_once(int timeout_ms) {
                         ssize_t bytes = sendfile(fd, in_fd, &offset, count);
                         cb(bytes);
                     }});
+                } else if (ctx.waiting_write) {
+                    ctx.waiting_write = false;
+                    auto cb = std::move(ctx.wait_write_cb);
+                    triggers.push_back({cb});
                 }
             }
             

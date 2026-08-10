@@ -20,6 +20,17 @@ endif()
 
 find_package(OpenSSL REQUIRED)
 find_package(ZLIB REQUIRED)
+find_package(PostgreSQL REQUIRED)
+
+include(FetchContent)
+FetchContent_Declare(
+  inja
+  GIT_REPOSITORY https://github.com/pantor/inja.git
+  GIT_TAG        v3.4.0
+)
+set(INJA_BUILD_TESTS OFF CACHE BOOL "Disable inja tests" FORCE)
+set(BUILD_BENCHMARK OFF CACHE BOOL "Disable inja benchmark" FORCE)
+FetchContent_MakeAvailable(inja)
 
 # Core static library
 add_library(server_core STATIC
@@ -51,11 +62,12 @@ add_library(server_core STATIC
     src/middleware/DistributedRateLimiter.cpp
     src/middleware/SessionManager.cpp
     src/database/RedisClient.cpp
+    src/database/PostgresClient.cpp
 )
 
 add_library(HttpServer::core ALIAS server_core)
 
-target_link_libraries(server_core PUBLIC OpenSSL::SSL OpenSSL::Crypto ZLIB::ZLIB uring)
+target_link_libraries(server_core PUBLIC OpenSSL::SSL OpenSSL::Crypto ZLIB::ZLIB uring inja PostgreSQL::PostgreSQL)
 
 target_include_directories(server_core PUBLIC 
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
@@ -142,6 +154,7 @@ add_executable(http_server_tests
     tests/test_router.cpp
     tests/test_threadpool.cpp
     tests/test_websocket.cpp
+    tests/test_ssr.cpp
 )
 target_link_libraries(http_server_tests PRIVATE gtest_main server_core)
 include(GoogleTest)

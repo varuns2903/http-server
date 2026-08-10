@@ -57,6 +57,9 @@ public:
     void json(const nlohmann::json& j) { set_body(j.dump(), "application/json"); }
     void html(const std::string& h) { set_body(h, "text/html"); }
     
+    // Server-Side Rendering
+    void render(const std::string& template_path, const nlohmann::json& data);
+    
     // Opens the file and sets up headers for sendfile()
     void send_file(const std::string& path, const std::string& content_type);
 

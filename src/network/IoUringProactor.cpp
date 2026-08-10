@@ -62,6 +62,40 @@ void IoUringProactor::async_write(int fd, const void* buffer, size_t size, std::
     }
 }
 
+void IoUringProactor::async_wait_read(int fd, std::function<void()> callback) {
+    auto* ctx = new IoContext();
+    ctx->type = OpType::WAIT_READ;
+    ctx->fd = fd;
+    ctx->wait_cb = std::move(callback);
+
+    std::lock_guard<std::mutex> lock(sq_mutex_);
+    struct io_uring_sqe* sqe = get_sqe_safe();
+    if (sqe) {
+        io_uring_prep_poll_add(sqe, fd, POLLIN);
+        io_uring_sqe_set_data(sqe, ctx);
+        io_uring_submit(&ring_);
+    } else {
+        delete ctx;
+    }
+}
+
+void IoUringProactor::async_wait_write(int fd, std::function<void()> callback) {
+    auto* ctx = new IoContext();
+    ctx->type = OpType::WAIT_WRITE;
+    ctx->fd = fd;
+    ctx->wait_cb = std::move(callback);
+
+    std::lock_guard<std::mutex> lock(sq_mutex_);
+    struct io_uring_sqe* sqe = get_sqe_safe();
+    if (sqe) {
+        io_uring_prep_poll_add(sqe, fd, POLLOUT);
+        io_uring_sqe_set_data(sqe, ctx);
+        io_uring_submit(&ring_);
+    } else {
+        delete ctx;
+    }
+}
+
 void IoUringProactor::async_sendfile(int out_fd, int in_fd, off_t offset, size_t count, std::function<void(ssize_t)> callback) {
     auto* ctx = new IoContext();
     ctx->type = OpType::SENDFILE;
@@ -170,6 +204,8 @@ void IoUringProactor::run_once(int timeout_ms) {
                     } else {
                         ctx->io_cb(-1);
                     }
+                } else if (ctx->type == OpType::WAIT_READ || ctx->type == OpType::WAIT_WRITE) {
+                    ctx->wait_cb();
                 } else {
                     ctx->io_cb(cqe->res);
                 }

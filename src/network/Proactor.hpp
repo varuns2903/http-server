@@ -19,6 +19,12 @@ public:
     // Asynchronous write
     virtual void async_write(int fd, const void* buffer, size_t size, std::function<void(ssize_t bytes_written)> callback) = 0;
     
+    // Asynchronous wait for read readiness
+    virtual void async_wait_read(int fd, std::function<void()> callback) = 0;
+
+    // Asynchronous wait for write readiness
+    virtual void async_wait_write(int fd, std::function<void()> callback) = 0;
+    
     // Asynchronous sendfile
     virtual void async_sendfile(int out_fd, int in_fd, off_t offset, size_t count, std::function<void(ssize_t bytes_written)> callback) = 0;
 
