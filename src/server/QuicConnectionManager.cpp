@@ -4,8 +4,8 @@
 
 namespace server {
 
-QuicConnectionManager::QuicConnectionManager(network::UdpSocket& socket)
-    : socket_(socket) {
+QuicConnectionManager::QuicConnectionManager(network::UdpSocket& socket, SSL_CTX* ssl_ctx)
+    : socket_(socket), ssl_ctx_(ssl_ctx) {
 }
 
 QuicConnectionManager::~QuicConnectionManager() {
@@ -18,7 +18,8 @@ void QuicConnectionManager::on_packet_received(const uint8_t* data, size_t datal
     ngtcp2_version_cid ver_cid;
     
     // Decode QUIC header to extract the Destination Connection ID (DCID)
-    int rv = ngtcp2_pkt_decode_version_cid(&ver_cid, data, datalen, 1);
+    // short_dcidlen must match the length of the SCID we generate (8 bytes).
+    int rv = ngtcp2_pkt_decode_version_cid(&ver_cid, data, datalen, 8);
     if (rv < 0) {
         std::cerr << "Failed to decode QUIC packet version and CID: " << ngtcp2_strerror(rv) << "\n";
         return;
@@ -27,30 +28,59 @@ void QuicConnectionManager::on_packet_received(const uint8_t* data, size_t datal
     ngtcp2_cid dcid_struct;
     ngtcp2_cid_init(&dcid_struct, ver_cid.dcid, ver_cid.dcidlen);
 
+    std::cout << "QCM: Incoming packet DCID (len=" << dcid_struct.datalen << ") = ";
+    for (size_t i = 0; i < dcid_struct.datalen; ++i) {
+        printf("%02x", dcid_struct.data[i]);
+    }
+    std::cout << "\n";
+
     auto it = connections_.find(dcid_struct);
     if (it != connections_.end()) {
-        // Route to existing connection
-        // it->second->process_packet(data, datalen, sender_addr);
+        std::cout << "QCM: Found existing connection for DCID (len=" << dcid_struct.datalen << ")\n";
+        it->second->process_packet(data, datalen, sender_addr);
     } else {
-        // Handle new connection (Initial packet)
         if (ver_cid.version == 0) {
-            // Version negotiation
+            std::cout << "QCM: Dropping version negotiation packet\n";
             return;
         }
         
-        std::cout << "Received QUIC packet for unknown connection, creating new QUIC connection instance (stub)\n";
-        // Create new QuicConnection, add to map, and process packet
-        // auto conn = std::make_shared<QuicConnection>(...);
-        // connections_[dcid_struct] = conn;
-        // conn->process_packet(data, datalen, sender_addr);
+        std::cout << "QCM: Received QUIC packet for unknown connection, creating new instance (DCID len=" << dcid_struct.datalen << ")\n";
+        
+        // Use client's SCID as our DCID, and generate a new random SCID for the server
+        ngtcp2_cid scid_struct;
+        scid_struct.datalen = 8;
+        for (size_t i = 0; i < 8; ++i) {
+            scid_struct.data[i] = static_cast<uint8_t>(rand() % 256);
+        }
+        
+        std::cout << "QCM: Generated SCID = ";
+        for (size_t i = 0; i < 8; ++i) {
+            printf("%02x", scid_struct.data[i]);
+        }
+        std::cout << "\n";
+
+        ngtcp2_cid parsed_scid;
+        ngtcp2_cid_init(&parsed_scid, ver_cid.scid, ver_cid.scidlen);
+
+        auto conn = std::make_shared<QuicConnection>(*this, dcid_struct, parsed_scid, scid_struct, sender_addr, ssl_ctx_);
+        connections_[dcid_struct] = conn;
+        connections_[scid_struct] = conn; // Also map by our SCID for return packets
+        conn->process_packet(data, datalen, sender_addr);
     }
 }
 
 void QuicConnectionManager::handle_timers() {
     // Iterate over connections and handle expiry
-    // for (auto& [cid, conn] : connections_) {
-    //     conn->handle_expiry();
-    // }
+    for (auto& [cid, conn] : connections_) {
+        conn->handle_expiry();
+    }
+}
+
+void QuicConnectionManager::send_packet(const uint8_t* data, size_t datalen, const sockaddr* remote_addr, socklen_t remote_addrlen) {
+    (void)remote_addrlen;
+    if (remote_addr->sa_family == AF_INET) {
+        socket_.send_to(reinterpret_cast<const char*>(data), datalen, *reinterpret_cast<const sockaddr_in*>(remote_addr));
+    }
 }
 
 } // namespace server

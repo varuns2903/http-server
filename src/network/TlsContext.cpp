@@ -6,7 +6,8 @@ namespace network {
 
 static int alpn_select_cb(SSL* ssl, const unsigned char** out, unsigned char* outlen,
                           const unsigned char* in, unsigned int inlen, void* arg) {
-    const unsigned char alpn_protos[] = {
+    static const unsigned char alpn_protos[] = {
+        2, 'h', '3',
         2, 'h', '2',
         8, 'h', 't', 't', 'p', '/', '1', '.', '1'
     };

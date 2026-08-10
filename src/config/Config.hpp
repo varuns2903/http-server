@@ -15,7 +15,7 @@ struct ServerConfig {
     std::string log_level{"INFO"};
     std::string static_dir{"./public"};
     size_t max_body_size{10485760}; // Default 10 MB limit
-    bool enable_quic{false}; // Enable HTTP/3 QUIC
+    bool enable_quic{true}; // Enable HTTP/3 QUIC
     std::string ssl_cert{""};
     std::string ssl_key{""};
     EventEngine engine{EventEngine::IoUring}; // Default to our new fast backend!

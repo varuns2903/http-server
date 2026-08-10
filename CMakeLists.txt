@@ -48,6 +48,7 @@ add_library(server_core STATIC
     src/server/Connection.cpp
     src/server/QuicConnection.cpp
     src/server/QuicConnectionManager.cpp
+    src/server/QuicHttp3Session.cpp
     src/server/ConnectionManager.cpp
     src/server/TimerManager.cpp
     src/network/EpollProactor.cpp

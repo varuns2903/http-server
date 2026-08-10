@@ -76,7 +76,7 @@ void App::listen() {
         quic_socket_ = std::make_unique<network::UdpSocket>();
         quic_socket_->set_non_blocking();
         quic_socket_->bind(config_.port);
-        quic_manager_ = std::make_unique<QuicConnectionManager>(*quic_socket_);
+        quic_manager_ = std::make_unique<QuicConnectionManager>(*quic_socket_, tls_context_ ? tls_context_->get() : nullptr);
         LOG_INFO("HTTP/3 QUIC enabled on UDP port " << config_.port);
     }
     
