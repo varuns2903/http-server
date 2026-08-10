@@ -4,6 +4,8 @@
 #include <vector>
 #include <cstdint>
 
+#include <zlib.h>
+
 namespace server {
     class Connection; // Forward declaration
 }
@@ -13,7 +15,8 @@ namespace websocket {
 
 class WebSocketConnection {
 public:
-    explicit WebSocketConnection(server::Connection& underlying_connection);
+    explicit WebSocketConnection(server::Connection& underlying_connection, bool enable_deflate = false);
+    ~WebSocketConnection();
 
     // User-facing API
     void on_message(std::function<void(const std::string&)> handler);
@@ -42,6 +45,16 @@ private:
     };
 
     bool parse_frame_header(const std::vector<char>& buffer, FrameHeader& header);
+    
+    bool deflate_enabled_{false};
+    z_stream inflate_stream_{};
+    z_stream deflate_stream_{};
+    bool streams_initialized_{false};
+    
+    void init_streams();
+    void cleanup_streams();
+    std::string deflate_payload(const std::string& payload);
+    std::string inflate_payload(const std::string& payload);
 };
 
 } // namespace websocket

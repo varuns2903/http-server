@@ -22,7 +22,7 @@ This document outlines the strategic future of the Orbit HTTP Framework. The roa
 *Goal: Stay at the bleeding edge of internet transmission standards.*
 
 - [ ] **HTTP/2 Multiplexing:** Upgrade from HTTP/1.1 to HTTP/2 to allow browsers to fetch dozens of assets simultaneously over a single multiplexed TCP connection using binary framing.
-- [ ] **Server-Sent Events (SSE):** Provide a lightweight, one-way streaming API alternative to WebSockets, perfect for real-time notifications, stock tickers, or LLM text generation streams.
+- [x] **Server-Sent Events (SSE):** Provide a lightweight, one-way streaming API alternative to WebSockets, perfect for real-time notifications, stock tickers, or LLM text generation streams.
 - [ ] **HTTP/3 (QUIC):** Implement UDP-based QUIC transport to virtually eliminate connection latency and packet-loss head-of-line blocking.
 
 ## Phase 4: True Cross-Platform Portability (Category 2)

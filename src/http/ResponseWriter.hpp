@@ -37,6 +37,9 @@ public:
     // End a chunked stream
     virtual void end() = 0;
 
+    // Send a Server-Sent Events (SSE) message
+    virtual void send_sse_event(std::string_view data, std::string_view event = "", std::string_view id = "") = 0;
+
     // Take over the connection for raw bi-directional byte streaming (e.g. WebSocket Proxying)
     virtual void upgrade_to_raw_stream(std::function<void(std::string_view)> on_data, std::function<void()> on_close) = 0;
 };

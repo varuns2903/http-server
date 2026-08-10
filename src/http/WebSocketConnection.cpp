@@ -7,8 +7,100 @@
 namespace http {
 namespace websocket {
 
-WebSocketConnection::WebSocketConnection(server::Connection& underlying_connection)
-    : connection_(underlying_connection) {}
+WebSocketConnection::WebSocketConnection(server::Connection& underlying_connection, bool enable_deflate)
+    : connection_(underlying_connection), deflate_enabled_(enable_deflate) {
+    if (deflate_enabled_) {
+        init_streams();
+    }
+}
+
+WebSocketConnection::~WebSocketConnection() {
+    if (streams_initialized_) {
+        cleanup_streams();
+    }
+}
+
+void WebSocketConnection::init_streams() {
+    std::memset(&inflate_stream_, 0, sizeof(z_stream));
+    std::memset(&deflate_stream_, 0, sizeof(z_stream));
+    
+    // -15 for raw deflate (no zlib headers)
+    if (inflateInit2(&inflate_stream_, -15) != Z_OK) {
+        deflate_enabled_ = false;
+        return;
+    }
+    
+    if (deflateInit2(&deflate_stream_, Z_DEFAULT_COMPRESSION, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
+        inflateEnd(&inflate_stream_);
+        deflate_enabled_ = false;
+        return;
+    }
+    streams_initialized_ = true;
+}
+
+void WebSocketConnection::cleanup_streams() {
+    inflateEnd(&inflate_stream_);
+    deflateEnd(&deflate_stream_);
+    streams_initialized_ = false;
+}
+
+std::string WebSocketConnection::deflate_payload(const std::string& payload) {
+    if (payload.empty()) return "";
+    
+    deflate_stream_.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(payload.data()));
+    deflate_stream_.avail_in = static_cast<uInt>(payload.size());
+    
+    std::string out;
+    char out_buf[16384];
+    
+    int ret;
+    do {
+        deflate_stream_.next_out = reinterpret_cast<Bytef*>(out_buf);
+        deflate_stream_.avail_out = sizeof(out_buf);
+        
+        ret = deflate(&deflate_stream_, Z_SYNC_FLUSH);
+        
+        if (ret == Z_STREAM_ERROR) return payload; // Fallback
+        
+        size_t have = sizeof(out_buf) - deflate_stream_.avail_out;
+        out.append(out_buf, have);
+    } while (deflate_stream_.avail_out == 0);
+    
+    // Remove the 0x00 0x00 0xFF 0xFF trailer
+    if (out.size() >= 4 && out.substr(out.size() - 4) == std::string("\x00\x00\xff\xff", 4)) {
+        out.resize(out.size() - 4);
+    }
+    
+    return out;
+}
+
+std::string WebSocketConnection::inflate_payload(const std::string& payload) {
+    if (payload.empty()) return "";
+    
+    // Append the stripped trailer
+    std::string in = payload + std::string("\x00\x00\xff\xff", 4);
+    
+    inflate_stream_.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(in.data()));
+    inflate_stream_.avail_in = static_cast<uInt>(in.size());
+    
+    std::string out;
+    char out_buf[16384];
+    
+    int ret;
+    do {
+        inflate_stream_.next_out = reinterpret_cast<Bytef*>(out_buf);
+        inflate_stream_.avail_out = sizeof(out_buf);
+        
+        ret = inflate(&inflate_stream_, Z_SYNC_FLUSH);
+        
+        if (ret == Z_STREAM_ERROR || ret == Z_DATA_ERROR || ret == Z_MEM_ERROR) return payload; // Fallback
+        
+        size_t have = sizeof(out_buf) - inflate_stream_.avail_out;
+        out.append(out_buf, have);
+    } while (inflate_stream_.avail_out == 0);
+    
+    return out;
+}
 
 void WebSocketConnection::on_message(std::function<void(const std::string&)> handler) {
     message_handler_ = std::move(handler);
@@ -23,9 +115,17 @@ void WebSocketConnection::send(const std::string& message) {
 
     std::vector<char> frame;
     // FIN bit set, OPCODE = 1 (text)
-    frame.push_back(static_cast<char>(0x81));
+    uint8_t byte0 = static_cast<uint8_t>(0x81);
+    
+    std::string final_payload = message;
+    if (deflate_enabled_) {
+        byte0 |= 0x40; // Set RSV1 bit
+        final_payload = deflate_payload(message);
+    }
+    
+    frame.push_back(static_cast<char>(byte0));
 
-    size_t len = message.length();
+    size_t len = final_payload.length();
     // Server does not mask payloads
     if (len <= 125) {
         frame.push_back(static_cast<char>(len));
@@ -45,7 +145,7 @@ void WebSocketConnection::send(const std::string& message) {
         }
     }
 
-    frame.insert(frame.end(), message.begin(), message.end());
+    frame.insert(frame.end(), final_payload.begin(), final_payload.end());
     connection_.write_raw(frame);
 }
 
@@ -71,6 +171,7 @@ bool WebSocketConnection::parse_frame_header(const std::vector<char>& buffer, Fr
 
     header.fin = (byte0 & 0x80) != 0;
     header.opcode = byte0 & 0x0F;
+    bool rsv1 = (byte0 & 0x40) != 0; // Compress flag
     header.masked = (byte1 & 0x80) != 0;
     
     uint8_t initial_len = byte1 & 0x7F;
@@ -140,7 +241,12 @@ void WebSocketConnection::process_raw_data(std::vector<char>& buffer) {
             }
 
             if (message_handler_) {
-                message_handler_(payload);
+                bool rsv1 = (buffer[0] & 0x40) != 0;
+                if (deflate_enabled_ && rsv1) {
+                    message_handler_(inflate_payload(payload));
+                } else {
+                    message_handler_(payload);
+                }
             }
         } else if (header.opcode == 0x9) {
             // Ping - Send Pong (0xA)

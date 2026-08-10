@@ -21,6 +21,7 @@ endif()
 find_package(OpenSSL REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(PostgreSQL REQUIRED)
+pkg_check_modules(NGHTTP2 REQUIRED libnghttp2)
 
 include(FetchContent)
 FetchContent_Declare(
@@ -67,9 +68,20 @@ add_library(server_core STATIC
 
 add_library(HttpServer::core ALIAS server_core)
 
-target_link_libraries(server_core PUBLIC OpenSSL::SSL OpenSSL::Crypto ZLIB::ZLIB uring inja PostgreSQL::PostgreSQL)
+target_link_libraries(server_core
+    PUBLIC
+        OpenSSL::SSL
+        OpenSSL::Crypto
+        ZLIB::ZLIB
+        ${PostgreSQL_LIBRARIES}
+        ${NGHTTP2_LIBRARIES}
+        uring
+        inja
+)
 
 target_include_directories(server_core PUBLIC 
+    ${PostgreSQL_INCLUDE_DIRS}
+    ${NGHTTP2_INCLUDE_DIRS}
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include/http-server>
 )

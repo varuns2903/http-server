@@ -191,9 +191,16 @@ void Connection::process_request() {
                     res.headers["Connection"] = "Upgrade";
                     res.headers["Sec-WebSocket-Accept"] = accept_key;
                     
+                    bool use_deflate = false;
+                    auto ext_it = req.headers.find("Sec-WebSocket-Extensions");
+                    if (ext_it != req.headers.end() && ext_it->second.find("permessage-deflate") != std::string::npos) {
+                        use_deflate = true;
+                        res.headers["Sec-WebSocket-Extensions"] = "permessage-deflate; client_no_context_takeover; server_no_context_takeover";
+                    }
+                    
                     std::string handshake_str = res.serialize();
                     
-                    auto ws_conn = std::make_unique<http::websocket::WebSocketConnection>(*this);
+                    auto ws_conn = std::make_unique<http::websocket::WebSocketConnection>(*this, use_deflate);
                     auto handler = router_.get_ws_route(req.uri);
                     
                     // Erase the HTTP request from the buffer before switching states!
@@ -407,6 +414,26 @@ void Connection::end() {
     } else {
         trigger_read();
     }
+}
+
+void Connection::send_sse_event(std::string_view data, std::string_view event, std::string_view id) {
+    std::string sse_msg;
+    if (!event.empty()) sse_msg += "event: " + std::string(event) + "\n";
+    if (!id.empty()) sse_msg += "id: " + std::string(id) + "\n";
+    
+    size_t start = 0;
+    while (start < data.size()) {
+        size_t end_pos = data.find('\n', start);
+        if (end_pos == std::string_view::npos) {
+            sse_msg += "data: " + std::string(data.substr(start)) + "\n";
+            break;
+        } else {
+            sse_msg += "data: " + std::string(data.substr(start, end_pos - start)) + "\n";
+            start = end_pos + 1;
+        }
+    }
+    sse_msg += "\n";
+    write_chunk(sse_msg);
 }
 
 void Connection::send_data(std::string_view data) {
