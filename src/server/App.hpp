@@ -5,6 +5,8 @@
 #include "../routing/Router.hpp"
 #include "../config/Config.hpp"
 #include "../network/TlsContext.hpp"
+#include "../network/UdpSocket.hpp"
+#include "QuicConnectionManager.hpp"
 #include <memory>
 
 namespace server {
@@ -51,6 +53,8 @@ private:
     config::ServerConfig config_;
     routing::Router router_;
     std::unique_ptr<Listener> listener_;
+    std::unique_ptr<network::UdpSocket> quic_socket_;
+    std::unique_ptr<QuicConnectionManager> quic_manager_;
     std::unique_ptr<network::TlsContext> tls_context_;
     std::unique_ptr<EventLoop> event_loop_;
 };

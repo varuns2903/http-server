@@ -540,9 +540,9 @@ void Connection::trigger_write() {
             return;
         }
         
-        if (file_fd_ != -1 && file_offset_ < file_size_) {
+        if (file_fd_ != -1 && file_size_ > file_offset_) {
             auto self = shared_from_this();
-            proactor_.async_sendfile(socket_.fd(), file_fd_, file_offset_, file_size_ - file_offset_, [self](ssize_t written) {
+            proactor_.async_sendfile(socket_.fd(), file_fd_, file_offset_, static_cast<size_t>(file_size_ - file_offset_), [self](ssize_t written) {
                 self->is_writing_ = false;
                 self->on_sendfile_complete(written);
             });
@@ -648,7 +648,7 @@ RequestState Connection::check_request_state() const {
         auto it = std::search(haystack.begin(), haystack.end(), needle.begin(), needle.end(), [](char ch1, char ch2) {
             return std::tolower(static_cast<unsigned char>(ch1)) == std::tolower(static_cast<unsigned char>(ch2));
         });
-        return it != haystack.end() ? std::distance(haystack.begin(), it) : std::string_view::npos;
+        return it != haystack.end() ? static_cast<size_t>(std::distance(haystack.begin(), it)) : std::string_view::npos;
     };
     
     size_t content_length_pos = ci_find(buf_view, "content-length:");

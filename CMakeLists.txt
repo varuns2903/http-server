@@ -46,6 +46,7 @@ add_library(server_core STATIC
     src/utils/Logger.cpp
     src/server/EventLoop.cpp
     src/server/Connection.cpp
+    src/server/QuicConnection.cpp
     src/server/QuicConnectionManager.cpp
     src/server/ConnectionManager.cpp
     src/server/TimerManager.cpp

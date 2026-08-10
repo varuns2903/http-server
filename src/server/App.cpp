@@ -72,7 +72,15 @@ void App::listen() {
     listener_ = std::make_unique<Listener>(config_.port);
     listener_->start();
     
-    event_loop_ = std::make_unique<EventLoop>(*listener_, router_, config_, tls_context_.get());
+    if (config_.enable_quic) {
+        quic_socket_ = std::make_unique<network::UdpSocket>();
+        quic_socket_->set_non_blocking();
+        quic_socket_->bind(config_.port);
+        quic_manager_ = std::make_unique<QuicConnectionManager>(*quic_socket_);
+        LOG_INFO("HTTP/3 QUIC enabled on UDP port " << config_.port);
+    }
+    
+    event_loop_ = std::make_unique<EventLoop>(*listener_, router_, config_, tls_context_.get(), quic_socket_.get(), quic_manager_.get());
     
     LOG_INFO("App started listening on port " << config_.port);
     event_loop_->run();

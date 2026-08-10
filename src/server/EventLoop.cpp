@@ -7,15 +7,21 @@
 
 namespace server {
 
-EventLoop::EventLoop(Listener& listener, const routing::Router& router, const config::ServerConfig& config, network::TlsContext* tls_context)
+EventLoop::EventLoop(Listener& listener, const routing::Router& router, const config::ServerConfig& config, network::TlsContext* tls_context, network::UdpSocket* quic_socket, QuicConnectionManager* quic_manager)
     : listener_(listener), 
       proactor_(config.engine == config::EventEngine::Epoll ? 
                static_cast<std::unique_ptr<network::Proactor>>(std::make_unique<network::EpollProactor>()) : 
                static_cast<std::unique_ptr<network::Proactor>>(std::make_unique<network::IoUringProactor>())),
       thread_pool_(config.worker_threads), 
-      connection_manager_(*proactor_, router, thread_pool_, timer_manager_, config.max_body_size, tls_context) {
+      connection_manager_(*proactor_, router, thread_pool_, timer_manager_, config.max_body_size, tls_context),
+      quic_socket_(quic_socket),
+      quic_manager_(quic_manager) {
     
     do_accept();
+
+    if (quic_socket_ && quic_manager_) {
+        do_read_quic();
+    }
 }
 
 void EventLoop::run() {
@@ -53,6 +59,24 @@ void EventLoop::do_accept() {
         
         if (is_running_) {
             do_accept();
+        }
+    });
+}
+
+void EventLoop::do_read_quic() {
+    proactor_->async_wait_read(quic_socket_->fd(), [this]() {
+        char buffer[65536];
+        sockaddr_in sender_addr;
+        while (true) {
+            ssize_t bytes_read = quic_socket_->recv_from(buffer, sizeof(buffer), sender_addr);
+            if (bytes_read > 0) {
+                quic_manager_->on_packet_received(reinterpret_cast<uint8_t*>(buffer), static_cast<size_t>(bytes_read), sender_addr);
+            } else {
+                break;
+            }
+        }
+        if (is_running_) {
+            do_read_quic();
         }
     });
 }
