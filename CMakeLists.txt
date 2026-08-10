@@ -22,6 +22,9 @@ find_package(OpenSSL REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(PostgreSQL REQUIRED)
 pkg_check_modules(NGHTTP2 REQUIRED libnghttp2)
+pkg_check_modules(NGTCP2 REQUIRED libngtcp2)
+pkg_check_modules(NGTCP2_CRYPTO_OSSL REQUIRED libngtcp2_crypto_ossl)
+pkg_check_modules(NGHTTP3 REQUIRED libnghttp3)
 
 include(FetchContent)
 FetchContent_Declare(
@@ -43,10 +46,12 @@ add_library(server_core STATIC
     src/utils/Logger.cpp
     src/server/EventLoop.cpp
     src/server/Connection.cpp
+    src/server/QuicConnectionManager.cpp
     src/server/ConnectionManager.cpp
     src/server/TimerManager.cpp
     src/network/EpollProactor.cpp
     src/network/IoUringProactor.cpp
+    src/network/UdpSocket.cpp
     src/concurrency/ThreadPool.cpp
     src/http/HttpParser.cpp
     src/http/HttpResponse.cpp
@@ -76,6 +81,9 @@ target_link_libraries(server_core
         ZLIB::ZLIB
         ${PostgreSQL_LIBRARIES}
         ${NGHTTP2_LIBRARIES}
+        ${NGTCP2_LIBRARIES}
+        ${NGTCP2_CRYPTO_OSSL_LIBRARIES}
+        ${NGHTTP3_LIBRARIES}
         uring
         inja
 )
@@ -83,6 +91,9 @@ target_link_libraries(server_core
 target_include_directories(server_core PUBLIC 
     ${PostgreSQL_INCLUDE_DIRS}
     ${NGHTTP2_INCLUDE_DIRS}
+    ${NGTCP2_INCLUDE_DIRS}
+    ${NGTCP2_CRYPTO_OSSL_INCLUDE_DIRS}
+    ${NGHTTP3_INCLUDE_DIRS}
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include/http-server>
 )
