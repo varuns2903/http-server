@@ -287,7 +287,13 @@ void Connection::send_error(http::HttpStatus status, const std::string& message)
 }
 
 void Connection::set_header(const std::string& key, const std::string& value) {
+    std::lock_guard<std::mutex> lock(write_mutex_);
     default_headers_[key] = value;
+}
+
+void Connection::add_interceptor(std::function<void(http::HttpResponse&)> interceptor) {
+    std::lock_guard<std::mutex> lock(write_mutex_);
+    interceptors_.push_back(std::move(interceptor));
 }
 
 void Connection::send_headers(http::HttpResponse& response) {
@@ -316,6 +322,13 @@ void Connection::send_headers(http::HttpResponse& response) {
 }
 
 void Connection::send(http::HttpResponse&& response) {
+    {
+        std::lock_guard<std::mutex> lock(write_mutex_);
+        for (auto& interceptor : interceptors_) {
+            interceptor(response);
+        }
+    }
+
     for (const auto& [k, v] : default_headers_) {
         if (response.headers.find(k) == response.headers.end()) {
             response.headers[k] = v;

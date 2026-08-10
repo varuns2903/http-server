@@ -45,6 +45,7 @@ public:
     void upgrade_to_websocket(std::unique_ptr<http::websocket::WebSocketConnection> ws_conn);
 
     // ResponseWriter Implementation
+    void add_interceptor(std::function<void(http::HttpResponse&)> interceptor) override;
     void set_header(const std::string& key, const std::string& value) override;
     network::Proactor& proactor() override { return proactor_; }
     concurrency::ThreadPool& thread_pool() override { return thread_pool_; }
@@ -109,6 +110,7 @@ private:
     std::unique_ptr<http::websocket::WebSocketConnection> ws_connection_;
     std::function<void(std::string_view)> raw_stream_on_data_;
     std::function<void()> raw_stream_on_close_;
+    std::vector<std::function<void(http::HttpResponse&)>> interceptors_;
 };
 
 } // namespace server

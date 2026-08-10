@@ -19,6 +19,13 @@ public:
     http::HttpResponse last_response;
     DummyProactor dummy_proactor;
     concurrency::ThreadPool dummy_thread_pool{1};
+    std::vector<Interceptor> interceptors_;
+
+    MockResponseWriter() = default;
+    
+    void add_interceptor(Interceptor interceptor) override {
+        interceptors_.push_back(std::move(interceptor));
+    }
 
     network::Proactor& proactor() override { return dummy_proactor; }
     concurrency::ThreadPool& thread_pool() override { return dummy_thread_pool; }

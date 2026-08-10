@@ -19,6 +19,7 @@ if(ENABLE_SANITIZERS AND CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 
 find_package(OpenSSL REQUIRED)
+find_package(ZLIB REQUIRED)
 
 # Core static library
 add_library(server_core STATIC
@@ -42,6 +43,7 @@ add_library(server_core STATIC
     src/routing/Router.cpp
     src/server/App.cpp
     src/middleware/StaticFiles.cpp
+    src/middleware/Compress.cpp
     src/middleware/Cors.cpp
     src/middleware/Proxy.cpp
     src/middleware/RateLimiter.cpp
@@ -52,7 +54,7 @@ add_library(server_core STATIC
 
 add_library(HttpServer::core ALIAS server_core)
 
-target_link_libraries(server_core PUBLIC OpenSSL::SSL OpenSSL::Crypto uring)
+target_link_libraries(server_core PUBLIC OpenSSL::SSL OpenSSL::Crypto ZLIB::ZLIB uring)
 
 target_include_directories(server_core PUBLIC 
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>

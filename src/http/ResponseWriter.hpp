@@ -13,6 +13,9 @@ class ResponseWriter {
 public:
     virtual ~ResponseWriter() = default;
 
+    using Interceptor = std::function<void(HttpResponse&)>;
+    virtual void add_interceptor(Interceptor interceptor) = 0;
+
     // Add a default header that will be included in the final response
     virtual void set_header(const std::string& key, const std::string& value) = 0;
 
