@@ -6,10 +6,12 @@ namespace network {
 
 static int alpn_select_cb(SSL* ssl, const unsigned char** out, unsigned char* outlen,
                           const unsigned char* in, unsigned int inlen, void* arg) {
-    // We only support HTTP/1.1 right now
-    const unsigned char http11[] = {8, 'h', 't', 't', 'p', '/', '1', '.', '1'};
-    
-    if (SSL_select_next_proto((unsigned char**)out, outlen, http11, sizeof(http11), in, inlen) == OPENSSL_NPN_NEGOTIATED) {
+    const unsigned char alpn_protos[] = {
+        2, 'h', '2',
+        8, 'h', 't', 't', 'p', '/', '1', '.', '1'
+    };
+
+    if (SSL_select_next_proto((unsigned char**)out, outlen, alpn_protos, sizeof(alpn_protos), in, inlen) == OPENSSL_NPN_NEGOTIATED) {
         return SSL_TLSEXT_ERR_OK;
     }
     

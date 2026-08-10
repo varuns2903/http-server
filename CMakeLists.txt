@@ -52,6 +52,7 @@ add_library(server_core STATIC
     src/http/HttpResponse.cpp
     src/http/MultipartForm.cpp
     src/http/WebSocketConnection.cpp
+    src/http/Http2Session.cpp
     src/routing/Router.cpp
     src/server/App.cpp
     src/middleware/StaticFiles.cpp

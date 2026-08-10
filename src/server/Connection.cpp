@@ -3,6 +3,7 @@
 #include "../http/HttpParser.hpp"
 #include "../http/WebSocket.hpp"
 #include "../http/WebSocketConnection.hpp"
+#include "../http/Http2Session.hpp"
 #include "../config/Config.hpp"
 #include <unistd.h>
 #include <iostream>
@@ -76,6 +77,13 @@ void Connection::on_read_complete(ssize_t bytes_read) {
             int ret = SSL_do_handshake(ssl_);
             if (ret == 1) {
                 is_tls_handshake_complete_ = true;
+                const unsigned char* alpn = nullptr;
+                unsigned int alpn_len = 0;
+                SSL_get0_alpn_selected(ssl_, &alpn, &alpn_len);
+                if (alpn_len == 2 && std::memcmp(alpn, "h2", 2) == 0) {
+                    state_ = ConnectionState::HTTP2;
+                    h2_session_ = std::make_shared<http::h2::Http2Session>(*this, router_, thread_pool_);
+                }
             } else {
                 int err = SSL_get_error(ssl_, ret);
                 if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
@@ -145,6 +153,23 @@ void Connection::on_read_complete(ssize_t bytes_read) {
         trigger_read();
         return;
     }
+    
+    if (state_ == ConnectionState::HTTP2) {
+        if (h2_session_) {
+            std::vector<char> local_buf;
+            {
+                std::lock_guard<std::mutex> lock(read_mutex_);
+                local_buf = std::move(read_buffer_);
+                read_buffer_.clear();
+            }
+            if (!local_buf.empty()) {
+                h2_session_->process_data(reinterpret_cast<const uint8_t*>(local_buf.data()), local_buf.size());
+            }
+        }
+        trigger_read();
+        return;
+    }
+    
     RequestState state = check_request_state();
     
     if (state == RequestState::COMPLETE) {

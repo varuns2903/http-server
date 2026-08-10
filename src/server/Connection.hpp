@@ -12,6 +12,7 @@
 #include <mutex>
 
 namespace http::websocket { class WebSocketConnection; }
+namespace http::h2 { class Http2Session; }
 
 namespace server {
 
@@ -20,7 +21,8 @@ class ConnectionManager; // Forward declaration
 enum class ConnectionState {
     HTTP,
     WEBSOCKET,
-    RAW_STREAM
+    RAW_STREAM,
+    HTTP2
 };
 
 enum class RequestState {
@@ -43,6 +45,7 @@ public:
     void write_raw(const std::vector<char>& data);
     void mark_for_close();
     void upgrade_to_websocket(std::unique_ptr<http::websocket::WebSocketConnection> ws_conn);
+    const std::string& client_ip() const { return client_ip_; }
 
     // ResponseWriter Implementation
     void add_interceptor(std::function<void(http::HttpResponse&)> interceptor) override;
@@ -109,6 +112,7 @@ private:
     std::atomic<bool> is_processing_request_{false};
     
     std::unique_ptr<http::websocket::WebSocketConnection> ws_connection_;
+    std::shared_ptr<http::h2::Http2Session> h2_session_;
     std::function<void(std::string_view)> raw_stream_on_data_;
     std::function<void()> raw_stream_on_close_;
     std::vector<std::function<void(http::HttpResponse&)>> interceptors_;
