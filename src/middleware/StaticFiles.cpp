@@ -26,6 +26,19 @@ routing::Middleware static_files(const std::string& directory) {
             
             if (req_str == base_str || req_str.find(base_str + "/") == 0) {
                 if (fs::is_regular_file(requested_path)) {
+                    auto ftime = fs::last_write_time(requested_path);
+                    auto fsize = fs::file_size(requested_path);
+                    std::string etag = "W/\"" + std::to_string(fsize) + "-" + std::to_string(ftime.time_since_epoch().count()) + "\"";
+                    
+                    auto inm_it = request.headers.find("If-None-Match");
+                    if (inm_it != request.headers.end() && inm_it->second == etag) {
+                        http::HttpResponse res;
+                        res.status(http::HttpStatus::NotModified);
+                        res.headers["ETag"] = etag;
+                        writer->send(std::move(res));
+                        return false;
+                    }
+                    
                     std::string ext = requested_path.extension().string();
                     std::string mime = "application/octet-stream";
                     if (ext == ".html") mime = "text/html";
@@ -38,6 +51,7 @@ routing::Middleware static_files(const std::string& directory) {
                     
                     http::HttpResponse res;
                     res.send_file(req_str, mime);
+                    res.headers["ETag"] = etag;
                     writer->send(std::move(res));
                     return false; // File served, stop pipeline!
                 }
