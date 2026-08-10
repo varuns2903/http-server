@@ -75,6 +75,7 @@ std::string HttpResponse::serialize_headers() const {
         case HttpStatus::NoContent: oss << "204 No Content\r\n"; break;
         case HttpStatus::NotModified: oss << "304 Not Modified\r\n"; break;
         case HttpStatus::BadRequest: oss << "400 Bad Request\r\n"; break;
+        case HttpStatus::Unauthorized: oss << "401 Unauthorized\r\n"; break;
         case HttpStatus::Forbidden: oss << "403 Forbidden\r\n"; break;
         case HttpStatus::NotFound: oss << "404 Not Found\r\n"; break;
         case HttpStatus::PayloadTooLarge: oss << "413 Payload Too Large\r\n"; break;

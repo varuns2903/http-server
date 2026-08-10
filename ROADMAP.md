@@ -9,7 +9,7 @@ This document outlines the strategic future of the Orbit HTTP Framework. The roa
 
 - [x] **Static File ETag Caching:** Implement HTTP caching in `StaticFiles.cpp` by hashing file contents (or using `Last-Modified` timestamps) to return `304 Not Modified` headers, eliminating redundant network transfers.
 - [x] **Auto-Compression Middleware (GZIP/Brotli):** Integrate `zlib` to dynamically compress HTTP responses for clients specifying `Accept-Encoding: gzip`, vastly reducing bandwidth footprint.
-- [ ] **Built-in JWT Authentication:** Develop a middleware utilizing our existing OpenSSL dependency to cryptographically verify HMAC-SHA256 JSON Web Tokens (JWTs) and attach the decoded user identity directly to the `HttpRequest` object.
+- [x] **Built-in JWT Authentication:** Develop a middleware utilizing our existing OpenSSL dependency to cryptographically verify HMAC-SHA256 JSON Web Tokens (JWTs) and attach the decoded user identity directly to the `HttpRequest` object.
 - [ ] **ACME Auto-TLS (Let's Encrypt):** (Deferred) Implement an automated state machine to provision and renew free SSL/TLS certificates on the fly.
 
 ## Phase 2: Web Developer Ergonomics (Category 4)

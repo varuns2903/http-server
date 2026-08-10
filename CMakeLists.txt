@@ -44,6 +44,7 @@ add_library(server_core STATIC
     src/server/App.cpp
     src/middleware/StaticFiles.cpp
     src/middleware/Compress.cpp
+    src/middleware/JwtAuth.cpp
     src/middleware/Cors.cpp
     src/middleware/Proxy.cpp
     src/middleware/RateLimiter.cpp
