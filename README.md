@@ -24,6 +24,17 @@
         <li><a href="#-editor-maincpp">📝 Editor</a></li>
       </ul>
       <hr/>
+      <h3>📖 Documentation</h3>
+      <ul>
+        <li><a href="docs/getting_started.md">Getting Started</a></li>
+        <li><a href="docs/routing.md">Routing & Streaming</a></li>
+        <li><a href="docs/middleware.md">Middleware & Validation</a></li>
+        <li><a href="docs/database.md">DB & C++20 Coroutines</a></li>
+        <li><a href="docs/proxy.md">API Gateway & LB</a></li>
+        <li><a href="docs/websockets.md">WebSockets</a></li>
+        <li><a href="docs/http3.md">HTTP/3 & QUIC</a></li>
+      </ul>
+      <hr/>
       <h3>⚙️ System Requirements</h3>
       <ul>
         <li><code>C++20 Compiler (GCC/Clang)</code></li>
