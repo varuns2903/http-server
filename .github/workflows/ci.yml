@@ -24,11 +24,18 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       run: |
         sudo apt-get update
-        sudo apt-get install -y cmake g++ libssl-dev libpq-dev libhiredis-dev pkg-config zlib1g-dev
+        sudo apt-get install -y cmake g++ libpq-dev libhiredis-dev pkg-config zlib1g-dev
         sudo apt-get install -y libnghttp2-dev liburing-dev
 
-        # ngtcp2 and nghttp3 are not in standard Ubuntu repos — build from source
-        # Install nghttp3
+        # Ubuntu's system OpenSSL lacks QUIC support. Build quictls/openssl (QUIC fork).
+        git clone --depth 1 --branch openssl-3.1.7+quic https://github.com/quictls/openssl.git quictls-openssl
+        cd quictls-openssl
+        ./config --prefix=/usr/local/quictls --libdir=lib no-tests
+        make -j$(nproc)
+        sudo make install_sw
+        cd ..
+
+        # Build nghttp3 against system libraries
         git clone --depth 1 --branch v1.6.0 https://github.com/ngtcp2/nghttp3.git
         cd nghttp3
         git submodule update --init
@@ -38,15 +45,23 @@ jobs:
         sudo make install
         cd ../..
 
-        # Install ngtcp2
+        # Build ngtcp2 against quictls OpenSSL (with QUIC support)
         git clone --depth 1 --branch v1.9.1 https://github.com/ngtcp2/ngtcp2.git
         cd ngtcp2
         git submodule update --init
         mkdir build && cd build
-        cmake -DCMAKE_INSTALL_PREFIX=/usr -DENABLE_LIB_ONLY=ON -DCMAKE_BUILD_TYPE=Release ..
+        cmake -DCMAKE_INSTALL_PREFIX=/usr \
+              -DENABLE_LIB_ONLY=ON \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DOPENSSL_ROOT_DIR=/usr/local/quictls \
+              ..
         make -j$(nproc)
         sudo make install
         cd ../..
+
+        # Ensure linker can find quictls libraries at runtime
+        echo "/usr/local/quictls/lib" | sudo tee /etc/ld.so.conf.d/quictls.conf
+        sudo ldconfig
 
     - name: Install Dependencies (macOS)
       if: matrix.os == 'macos-latest'
@@ -57,7 +72,9 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       run: |
         mkdir -p build && cd build
-        cmake -DCMAKE_BUILD_TYPE=Release ..
+        cmake -DCMAKE_BUILD_TYPE=Release \
+              -DOPENSSL_ROOT_DIR=/usr/local/quictls \
+              ..
 
     - name: Configure CMake (macOS)
       if: matrix.os == 'macos-latest'
