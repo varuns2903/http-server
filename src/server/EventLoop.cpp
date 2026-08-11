@@ -1,7 +1,11 @@
 #include "EventLoop.hpp"
 #include "../utils/Logger.hpp"
+#if defined(__APPLE__) || defined(__FreeBSD__)
+#include "../network/KqueueProactor.hpp"
+#else
 #include "../network/EpollProactor.hpp"
 #include "../network/IoUringProactor.hpp"
+#endif
 #include <iostream>
 #include <arpa/inet.h>
 #include <thread>
@@ -11,9 +15,13 @@ namespace server {
 
 EventLoop::EventLoop(Listener& listener, const routing::Router& router, const config::ServerConfig& config, network::TlsContext* tls_context, network::UdpSocket* quic_socket, QuicConnectionManager* quic_manager)
     : listener_(listener), 
+#if defined(__APPLE__) || defined(__FreeBSD__)
+      proactor_(std::make_unique<network::KqueueProactor>()),
+#else
       proactor_(config.engine == config::EventEngine::Epoll ? 
                static_cast<std::unique_ptr<network::Proactor>>(std::make_unique<network::EpollProactor>()) : 
                static_cast<std::unique_ptr<network::Proactor>>(std::make_unique<network::IoUringProactor>())),
+#endif
       thread_pool_(config.worker_threads), 
       connection_manager_(*proactor_, router, thread_pool_, timer_manager_, config.max_body_size, tls_context),
       quic_socket_(quic_socket),

@@ -37,6 +37,12 @@ set(BUILD_BENCHMARK OFF CACHE BOOL "Disable inja benchmark" FORCE)
 FetchContent_MakeAvailable(inja)
 
 # Core static library
+if(APPLE OR CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+    set(PROACTOR_SOURCES src/network/KqueueProactor.cpp)
+else()
+    set(PROACTOR_SOURCES src/network/EpollProactor.cpp src/network/IoUringProactor.cpp)
+endif()
+
 add_library(server_core STATIC
     src/network/Socket.cpp
     src/network/ConnectionPool.cpp
@@ -52,8 +58,7 @@ add_library(server_core STATIC
     src/utils/PrometheusRegistry.cpp
     src/server/ConnectionManager.cpp
     src/server/TimerManager.cpp
-    src/network/EpollProactor.cpp
-    src/network/IoUringProactor.cpp
+    ${PROACTOR_SOURCES}
     src/network/UdpSocket.cpp
     src/concurrency/ThreadPool.cpp
     src/http/HttpParser.cpp
@@ -90,9 +95,12 @@ target_link_libraries(server_core
         ${NGTCP2_LIBRARIES}
         ${NGTCP2_CRYPTO_OSSL_LIBRARIES}
         ${NGHTTP3_LIBRARIES}
-        uring
         inja
 )
+
+if(NOT APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+    target_link_libraries(server_core PUBLIC uring)
+endif()
 
 target_include_directories(server_core PUBLIC 
     ${PostgreSQL_INCLUDE_DIRS}
