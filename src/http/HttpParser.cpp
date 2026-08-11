@@ -1,4 +1,5 @@
 #include "HttpParser.hpp"
+#include <sstream>
 
 namespace http {
 

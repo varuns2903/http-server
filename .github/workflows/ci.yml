@@ -22,6 +22,9 @@ jobs:
 
     - name: Install Dependencies (Ubuntu)
       if: matrix.os == 'ubuntu-latest'
+      env:
+        PKG_CONFIG_PATH: /usr/local/quictls/lib/pkgconfig
+        OPENSSL_ROOT_DIR: /usr/local/quictls
       run: |
         sudo apt-get update
         sudo apt-get install -y cmake g++ libpq-dev libhiredis-dev pkg-config zlib1g-dev
@@ -47,25 +50,29 @@ jobs:
         sudo make install
         cd ../..
 
-        # Build ngtcp2 with quictls — set PKG_CONFIG_PATH so it finds quictls
-        export PKG_CONFIG_PATH="/usr/local/quictls/lib/pkgconfig:$PKG_CONFIG_PATH"
+        # Build ngtcp2 with quictls
         git clone --depth 1 --branch v1.9.1 https://github.com/ngtcp2/ngtcp2.git
         cd ngtcp2
         git submodule update --init
         mkdir build && cd build
+        PKG_CONFIG_PATH="/usr/local/quictls/lib/pkgconfig:$PKG_CONFIG_PATH" \
         cmake -DCMAKE_INSTALL_PREFIX=/usr \
               -DENABLE_LIB_ONLY=ON \
               -DCMAKE_BUILD_TYPE=Release \
               -DENABLE_OPENSSL=ON \
               -DOPENSSL_ROOT_DIR=/usr/local/quictls \
-              -DCMAKE_FIND_ROOT_PATH=/usr/local/quictls \
+              -DOPENSSL_INCLUDE_DIR=/usr/local/quictls/include \
+              -DOPENSSL_CRYPTO_LIBRARY=/usr/local/quictls/lib/libcrypto.so \
+              -DOPENSSL_SSL_LIBRARY=/usr/local/quictls/lib/libssl.so \
               ..
         make -j$(nproc)
         sudo make install
         cd ../..
 
-        # Verify the .pc file was installed
-        pkg-config --modversion libngtcp2_crypto_ossl || echo "WARNING: libngtcp2_crypto_ossl not found"
+        # Debug: verify .pc files installed
+        echo "--- Installed ngtcp2 .pc files ---"
+        find /usr -name "libngtcp2*.pc" 2>/dev/null
+        pkg-config --modversion libngtcp2_crypto_ossl || echo "WARN: libngtcp2_crypto_ossl .pc not found"
 
     - name: Install Dependencies (macOS)
       if: matrix.os == 'macos-latest'
