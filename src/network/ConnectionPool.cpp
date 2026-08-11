@@ -1,16 +1,18 @@
 #include "ConnectionPool.hpp"
 #include <unistd.h>
 #include <sys/socket.h>
+#include <openssl/ssl.h>
 
 namespace network {
 
-int ConnectionPool::acquire(const std::string& host, int port) {
+std::pair<int, void*> ConnectionPool::acquire(const std::string& host, int port) {
     std::unique_lock<std::mutex> lock(mutex_);
     std::string key = host + ":" + std::to_string(port);
     
     auto it = pool_.find(key);
     if (it != pool_.end() && !it->second.empty()) {
         int fd = it->second.back().fd;
+        void* ssl = it->second.back().ssl;
         it->second.pop_back();
         
         // Simple check if socket is still alive by peeking 1 byte without blocking
@@ -18,24 +20,26 @@ int ConnectionPool::acquire(const std::string& host, int port) {
         ssize_t ret = recv(fd, &buf, 1, MSG_PEEK | MSG_DONTWAIT);
         if (ret == 0) {
             // Socket was closed by peer cleanly
+            if (ssl) SSL_free(static_cast<SSL*>(ssl));
             close(fd);
             // Recursive fallback to get the next one
             lock.unlock();
             return acquire(host, port);
         } else if (ret < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
             // Socket has an error
+            if (ssl) SSL_free(static_cast<SSL*>(ssl));
             close(fd);
             lock.unlock();
             return acquire(host, port);
         }
         
-        return fd;
+        return {fd, ssl};
     }
     
-    return -1;
+    return {-1, nullptr};
 }
 
-void ConnectionPool::release(const std::string& host, int port, int fd) {
+void ConnectionPool::release(const std::string& host, int port, int fd, void* ssl) {
     if (fd < 0) return;
     
     std::lock_guard<std::mutex> lock(mutex_);
@@ -43,6 +47,7 @@ void ConnectionPool::release(const std::string& host, int port, int fd) {
     
     PooledConnection conn;
     conn.fd = fd;
+    conn.ssl = ssl;
     conn.last_used = std::chrono::steady_clock::now();
     
     pool_[key].push_back(conn);
@@ -56,6 +61,7 @@ void ConnectionPool::cleanup_stale_connections() {
         auto it = conns.begin();
         while (it != conns.end()) {
             if (std::chrono::duration_cast<std::chrono::seconds>(now - it->last_used).count() > 60) {
+                if (it->ssl) SSL_free(static_cast<SSL*>(it->ssl));
                 close(it->fd);
                 it = conns.erase(it);
             } else {

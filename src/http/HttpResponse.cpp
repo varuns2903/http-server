@@ -93,6 +93,7 @@ std::string HttpResponse::serialize_headers() const {
         case HttpStatus::PayloadTooLarge: oss << "413 Payload Too Large\r\n"; break;
         case HttpStatus::TooManyRequests: oss << "429 Too Many Requests\r\n"; break;
         case HttpStatus::RequestHeaderFieldsTooLarge: oss << "431 Request Header Fields Too Large\r\n"; break;
+        case HttpStatus::UnprocessableEntity: oss << "422 Unprocessable Entity\r\n"; break;
         case HttpStatus::InternalServerError: oss << "500 Internal Server Error\r\n"; break;
     }
 

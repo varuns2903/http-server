@@ -72,6 +72,7 @@ add_library(server_core STATIC
     src/middleware/RateLimiter.cpp
     src/middleware/DistributedRateLimiter.cpp
     src/middleware/SessionManager.cpp
+    src/middleware/Validation.cpp
     src/middleware/Metrics.cpp
     src/database/RedisClient.cpp
     src/database/PostgresClient.cpp

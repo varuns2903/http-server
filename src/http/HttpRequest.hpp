@@ -22,9 +22,13 @@ struct HttpRequest {
     std::string session_id; // Set by SessionManager middleware
     nlohmann::json user; // Populated by JwtAuth middleware
 
+    mutable nlohmann::json json_body; // Cached parsed JSON
+    
     nlohmann::json json() const {
+        if (!json_body.empty()) return json_body;
         if (body.empty()) return nlohmann::json::object();
-        return nlohmann::json::parse(body);
+        json_body = nlohmann::json::parse(body, nullptr, false); // false = no exceptions
+        return json_body;
     }
 
     MultipartForm form() const {

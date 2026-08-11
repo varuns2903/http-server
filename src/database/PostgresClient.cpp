@@ -3,8 +3,8 @@
 
 namespace database {
 
-PostgresClient::PostgresClient(std::shared_ptr<network::Proactor> proactor, const std::string& conninfo)
-    : proactor_(std::move(proactor)), conninfo_(conninfo) {}
+PostgresClient::PostgresClient(network::Proactor* proactor, const std::string& conninfo)
+    : proactor_(proactor), conninfo_(conninfo) {}
 
 PostgresClient::~PostgresClient() {
     if (conn_) {

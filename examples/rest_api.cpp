@@ -1,63 +1,102 @@
-#include "server/App.hpp"
+#include "../src/server/App.hpp"
+#include "../src/config/Config.hpp"
+#include "../src/database/PostgresClient.hpp"
+#include "../src/database/PostgresCoro.hpp"
+#include "../src/concurrency/Task.hpp"
+#include "../src/middleware/Validation.hpp"
+#include "../src/http/json.hpp"
 #include <iostream>
-#include <vector>
+#include <memory>
+#include <string>
 
-struct User {
-    int id;
-    std::string name;
-    std::string email;
-};
+using namespace server;
+using namespace http;
+using namespace middleware;
+using namespace database;
+using namespace concurrency;
+
+// C++20 Coroutine Handler Example
+Task coro_db_handler(HttpRequest& req, std::shared_ptr<ResponseWriter> writer, std::shared_ptr<PostgresClient> pg_client) {
+    // 1. Await database connection natively without blocking threads!
+    bool connected = co_await connect_async(pg_client);
+    if (!connected) {
+        HttpResponse res;
+        res.status(HttpStatus::InternalServerError).send("DB Connection Failed");
+        writer->send(std::move(res));
+        co_return; // Important: co_return exits the coroutine
+    }
+
+    // 2. Await query
+    PGresult* res = co_await query_async(pg_client, "SELECT current_timestamp;");
+    if (res) {
+        std::string ts = PQgetvalue(res, 0, 0);
+        PQclear(res);
+        
+        HttpResponse out;
+        out.status(HttpStatus::OK).send("{\"timestamp\": \"" + ts + "\"}");
+        out.headers["Content-Type"] = "application/json";
+        writer->send(std::move(out));
+    } else {
+        HttpResponse out;
+        out.status(HttpStatus::InternalServerError).send("Query failed");
+        writer->send(std::move(out));
+    }
+}
 
 int main() {
-    config::ServerConfig cfg;
-    cfg.port = 8080;
-    server::App app(cfg);
+    config::ServerConfig config;
+    config.port = 8081;
 
-    // Mock database
-    std::vector<User> db = {
-        {1, "Alice", "alice@example.com"},
-        {2, "Bob", "bob@example.com"}
+    App app(config);
+
+    // FEATURE 1: Global Error Handling Middleware
+    app.on_error([](const std::exception& e, HttpRequest& req, std::shared_ptr<ResponseWriter> writer) {
+        std::cerr << "[Global Error Handler] Caught exception: " << e.what() << "\n";
+        HttpResponse res;
+        nlohmann::json err;
+        err["error"] = "Internal Server Error";
+        err["message"] = e.what();
+        res.status(HttpStatus::InternalServerError).send(err.dump());
+        res.headers["Content-Type"] = "application/json";
+        writer->send(std::move(res));
+    });
+
+    // FEATURE 2: Automated JSON Schema Validation
+    std::vector<SchemaField> user_schema = {
+        {"username", JsonType::STRING, true},
+        {"age", JsonType::NUMBER, true},
+        {"is_active", JsonType::BOOLEAN, false}
     };
 
-    // Global Middleware for JSON API
-    app.use([](http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> writer) {
-        writer->set_header("Content-Type", "application/json");
-        return true; // continue
-    });
+    app.post("/users", {validate_json(user_schema)}, [](HttpRequest& req, std::shared_ptr<ResponseWriter> writer) {
+        // We know for a fact json() has "username" and "age" correctly typed!
+        nlohmann::json j = req.json();
+        std::string username = j["username"];
+        int age = j["age"];
 
-    app.get("/api/users", [&db](const http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> writer) {
-        nlohmann::json res_json = nlohmann::json::array();
-        for (const auto& u : db) {
-            res_json.push_back({{"id", u.id}, {"name", u.name}, {"email", u.email}});
-        }
-        
-        http::HttpResponse res;
-        res.status_code = http::HttpStatus::OK;
-        res.set_body(res_json.dump(4));
+        HttpResponse res;
+        res.status(HttpStatus::Created).send("{\"status\": \"user created\", \"user\": \"" + username + "\"}");
+        res.headers["Content-Type"] = "application/json";
         writer->send(std::move(res));
     });
 
-    app.post("/api/users", [&db](const http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> writer) {
-        auto json = req.json();
-        
-        if (!json.contains("name") || !json.contains("email")) {
-            http::HttpResponse res;
-            res.status_code = http::HttpStatus::BadRequest;
-            res.set_body(nlohmann::json({{"error", "Missing name or email"}}).dump());
-            writer->send(std::move(res));
-            return;
-        }
-
-        User u{static_cast<int>(db.size() + 1), json["name"], json["email"]};
-        db.push_back(u);
-
-        http::HttpResponse res;
-        res.status_code = http::HttpStatus::Created;
-        res.set_body(nlohmann::json({{"id", u.id}, {"message", "User created"}}).dump());
-        writer->send(std::move(res));
+    // Throw route to test global error handler
+    app.get("/crash", [](HttpRequest& req, std::shared_ptr<ResponseWriter> writer) {
+        throw std::runtime_error("Simulated catastrophic failure in route handler!");
     });
 
-    std::cout << "Starting REST API on http://localhost:8080" << std::endl;
+    // FEATURE 3: C++20 Coroutines
+    // Note: To test this locally, you need a postgres server on localhost.
+    app.get("/db", [](HttpRequest& req, std::shared_ptr<ResponseWriter> writer) {
+        auto pg_client = std::make_shared<PostgresClient>(&writer->proactor(), "dbname=postgres user=postgres");
+        coro_db_handler(req, writer, pg_client);
+    });
+
+    std::cout << "REST API Server starting on port 8081...\n";
+    std::cout << "Test validation: curl -X POST -d '{\"username\":\"john\",\"age\":30}' http://localhost:8081/users\n";
+    std::cout << "Test validation failure: curl -X POST -d '{\"age\":\"string_not_number\"}' http://localhost:8081/users\n";
+    std::cout << "Test error handler: curl http://localhost:8081/crash\n";
+    
     app.listen();
 
     return 0;

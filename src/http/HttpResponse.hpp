@@ -21,6 +21,7 @@ enum class HttpStatus {
     PayloadTooLarge = 413,
     TooManyRequests = 429,
     RequestHeaderFieldsTooLarge = 431,
+    UnprocessableEntity = 422,
     InternalServerError = 500
 };
 

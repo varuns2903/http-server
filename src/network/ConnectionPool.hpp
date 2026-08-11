@@ -10,6 +10,7 @@ namespace network {
 
 struct PooledConnection {
     int fd{-1};
+    void* ssl{nullptr};
     std::chrono::steady_clock::time_point last_used;
 };
 
@@ -20,11 +21,11 @@ public:
         return instance;
     }
 
-    // Gets a connection immediately if available, or -1 if none idle
-    int acquire(const std::string& host, int port);
+    // Gets a connection immediately if available, returning pair {fd, ssl_ptr}
+    std::pair<int, void*> acquire(const std::string& host, int port);
     
     // Returns a connection back to the pool
-    void release(const std::string& host, int port, int fd);
+    void release(const std::string& host, int port, int fd, void* ssl = nullptr);
     
     // Removes closed or stale connections
     void cleanup_stale_connections();

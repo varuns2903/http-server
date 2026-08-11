@@ -49,8 +49,12 @@ public:
     }
 
     void start() {
-        fd_ = network::ConnectionPool::get_instance().acquire(host_, port_);
-        if (fd_ != -1) {
+        auto [fd, ssl_ptr] = network::ConnectionPool::get_instance().acquire(host_, port_);
+        if (fd != -1) {
+            fd_ = fd;
+            if (is_https_) {
+                ssl_ = static_cast<SSL*>(ssl_ptr);
+            }
             is_reused_ = true;
             on_connected();
             return;
@@ -300,9 +304,10 @@ private:
     void check_completion() {
         if (is_keep_alive_eligible_ && body_bytes_read_ >= content_length_) {
             writer_->end();
-            network::ConnectionPool::get_instance().release(host_, port_, fd_);
+            network::ConnectionPool::get_instance().release(host_, port_, fd_, ssl_);
             proactor_.remove(fd_);
             fd_ = -1; // Prevent destructor from closing
+            ssl_ = nullptr; // Prevent destructor from freeing
             return;
         }
         // If chunked, we should theoretically parse chunks here, but for now we'll 

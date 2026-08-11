@@ -21,6 +21,7 @@ public:
     App& operator=(const App&) = delete;
 
     // Middleware
+    void on_error(routing::ErrorHandler handler);
     App& use(routing::Middleware m);
 
     // Route Grouping

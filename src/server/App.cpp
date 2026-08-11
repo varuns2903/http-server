@@ -34,6 +34,10 @@ App::~App() {
     stop();
 }
 
+void App::on_error(routing::ErrorHandler handler) {
+    router_.on_error(std::move(handler));
+}
+
 App& App::use(routing::Middleware m) {
     router_.use(std::move(m));
     return *this;
