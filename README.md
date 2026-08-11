@@ -16,40 +16,20 @@
 
 <table>
   <tr>
-    <td width="270" valign="top">
-      <h3>🧭 Navigation Menu</h3>
-      <ul>
-        <li><a href="#-dashboard-capability-matrix">📊 Dashboard</a></li>
-        <li><a href="#-terminal-quick-start">💻 Terminal</a></li>
-        <li><a href="#-editor-maincpp">📝 Editor</a></li>
-      </ul>
-      <hr/>
+    <td width="300" valign="top">
+      <h3>🧭 Quick Links</h3>
+      <p><a href="#-dashboard-capability-matrix">📊 Dashboard & Matrix</a></p>
+      <p><a href="#-terminal-quick-start">💻 Quick Start</a></p>
+      <p><a href="#-editor-maincpp">📝 Code Example</a></p>
+      <br/>
       <h3>📖 Documentation</h3>
-      <ul>
-        <li><a href="docs/getting_started.md">Getting Started</a></li>
-        <li><a href="docs/routing.md">Routing & Streaming</a></li>
-        <li><a href="docs/middleware.md">Middleware & Validation</a></li>
-        <li><a href="docs/database.md">DB & C++20 Coroutines</a></li>
-        <li><a href="docs/proxy.md">API Gateway & LB</a></li>
-        <li><a href="docs/websockets.md">WebSockets</a></li>
-        <li><a href="docs/http3.md">HTTP/3 & QUIC</a></li>
-      </ul>
-      <hr/>
-      <h3>⚙️ System Requirements</h3>
-      <ul>
-        <li><code>C++20 Compiler (GCC/Clang)</code></li>
-        <li><code>Linux 5.6+ (io_uring)</code></li>
-        <li><code>CMake 3.15+</code></li>
-        <li><code>OpenSSL</code></li>
-        <li><code>Hiredis</code></li>
-        <li><code>liburing</code></li>
-      </ul>
-      <hr/>
-      <h3>🧪 Diagnostics</h3>
-      <ul>
-        <li><code>make e2e-test</code></li>
-        <li><code>make benchmark</code></li>
-      </ul>
+      <p><a href="docs/getting_started.md">🚀 Getting Started</a></p>
+      <p><a href="docs/routing.md">🛣️ Routing & Streaming</a></p>
+      <p><a href="docs/middleware.md">🛡️ Middleware & Validation</a></p>
+      <p><a href="docs/database.md">💾 Postgres & C++20 Coroutines</a></p>
+      <p><a href="docs/proxy.md">🔀 API Gateway & LB</a></p>
+      <p><a href="docs/websockets.md">🔌 WebSockets</a></p>
+      <p><a href="docs/http3.md">⚡ HTTP/3 & QUIC</a></p>
     </td>
     <td valign="top">
 
@@ -146,6 +126,16 @@ Orbit is designed around a highly scalable, multi-threaded **Proactor pattern**:
 - **Middleware Pluggability**: Features built-in modules like global rate-limiting, Redis-backed distributed sessions, zero-copy static file serving, and JWT authentication.
 
 </details>
+
+### ⚙️ System Requirements
+- `C++20 Compiler (GCC/Clang)`
+- `Linux 5.6+ (io_uring)`
+- `CMake 3.15+`
+- `OpenSSL`, `Hiredis`, `libpq`, `liburing`
+
+### 🧪 Diagnostics
+- `make e2e-test` (End-to-End Tests)
+- `make benchmark` (Performance Testing)
 
 <div align="center">
   <br/>
