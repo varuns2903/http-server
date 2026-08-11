@@ -26,7 +26,7 @@ struct io_uring_sqe* IoUringProactor::get_sqe_safe() {
     return sqe;
 }
 
-void IoUringProactor::async_read(int fd, void* buffer, size_t size, std::function<void(ssize_t)> callback) {
+void IoUringProactor::async_read(socket_t fd, void* buffer, size_t size, std::function<void(ssize_t)> callback) {
     auto* ctx = new IoContext();
     ctx->type = OpType::READ;
     ctx->fd = fd;
@@ -44,7 +44,7 @@ void IoUringProactor::async_read(int fd, void* buffer, size_t size, std::functio
     }
 }
 
-void IoUringProactor::async_write(int fd, const void* buffer, size_t size, std::function<void(ssize_t)> callback) {
+void IoUringProactor::async_write(socket_t fd, const void* buffer, size_t size, std::function<void(ssize_t)> callback) {
     auto* ctx = new IoContext();
     ctx->type = OpType::WRITE;
     ctx->fd = fd;
@@ -62,7 +62,7 @@ void IoUringProactor::async_write(int fd, const void* buffer, size_t size, std::
     }
 }
 
-void IoUringProactor::async_wait_read(int fd, std::function<void()> callback) {
+void IoUringProactor::async_wait_read(socket_t fd, std::function<void()> callback) {
     auto* ctx = new IoContext();
     ctx->type = OpType::WAIT_READ;
     ctx->fd = fd;
@@ -79,7 +79,7 @@ void IoUringProactor::async_wait_read(int fd, std::function<void()> callback) {
     }
 }
 
-void IoUringProactor::async_wait_write(int fd, std::function<void()> callback) {
+void IoUringProactor::async_wait_write(socket_t fd, std::function<void()> callback) {
     auto* ctx = new IoContext();
     ctx->type = OpType::WAIT_WRITE;
     ctx->fd = fd;
@@ -96,7 +96,7 @@ void IoUringProactor::async_wait_write(int fd, std::function<void()> callback) {
     }
 }
 
-void IoUringProactor::async_sendfile(int out_fd, int in_fd, off_t offset, size_t count, std::function<void(ssize_t)> callback) {
+void IoUringProactor::async_sendfile(socket_t out_fd, int in_fd, off_t offset, size_t count, std::function<void(ssize_t)> callback) {
     auto* ctx = new IoContext();
     ctx->type = OpType::SENDFILE;
     ctx->fd = out_fd;
@@ -118,7 +118,7 @@ void IoUringProactor::async_sendfile(int out_fd, int in_fd, off_t offset, size_t
     }
 }
 
-void IoUringProactor::async_accept(int fd, std::function<void(int, sockaddr_in)> callback) {
+void IoUringProactor::async_accept(socket_t fd, std::function<void(socket_t, sockaddr_in)> callback) {
     auto* ctx = new IoContext();
     ctx->type = OpType::ACCEPT;
     ctx->fd = fd;
@@ -137,7 +137,7 @@ void IoUringProactor::async_accept(int fd, std::function<void(int, sockaddr_in)>
     }
 }
 
-void IoUringProactor::async_connect(int fd, const sockaddr_in& addr, std::function<void(int)> callback) {
+void IoUringProactor::async_connect(socket_t fd, const sockaddr_in& addr, std::function<void(int)> callback) {
     auto* ctx = new IoContext();
     ctx->type = OpType::CONNECT;
     ctx->fd = fd;
@@ -156,7 +156,7 @@ void IoUringProactor::async_connect(int fd, const sockaddr_in& addr, std::functi
     }
 }
 
-void IoUringProactor::remove(int fd) {
+void IoUringProactor::remove(socket_t fd) {
     // When the socket is closed, the kernel automatically cancels pending requests on it.
     // We can also explicitly submit a cancel request if desired.
     std::lock_guard<std::mutex> lock(sq_mutex_);

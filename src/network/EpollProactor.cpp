@@ -49,7 +49,7 @@ void EpollProactor::update_epoll(Context& ctx) {
     }
 }
 
-void EpollProactor::async_read(int fd, void* buffer, size_t size, std::function<void(ssize_t)> callback) {
+void EpollProactor::async_read(socket_t fd, void* buffer, size_t size, std::function<void(ssize_t)> callback) {
     std::lock_guard<std::mutex> lock(ctx_mutex_);
     auto& ctx = contexts_[fd];
     ctx.fd = fd;
@@ -60,7 +60,7 @@ void EpollProactor::async_read(int fd, void* buffer, size_t size, std::function<
     update_epoll(ctx);
 }
 
-void EpollProactor::async_write(int fd, const void* buffer, size_t size, std::function<void(ssize_t)> callback) {
+void EpollProactor::async_write(socket_t fd, const void* buffer, size_t size, std::function<void(ssize_t)> callback) {
     std::lock_guard<std::mutex> lock(ctx_mutex_);
     auto& ctx = contexts_[fd];
     ctx.fd = fd;
@@ -71,7 +71,7 @@ void EpollProactor::async_write(int fd, const void* buffer, size_t size, std::fu
     update_epoll(ctx);
 }
 
-void EpollProactor::async_wait_read(int fd, std::function<void()> callback) {
+void EpollProactor::async_wait_read(socket_t fd, std::function<void()> callback) {
     std::lock_guard<std::mutex> lock(ctx_mutex_);
     auto& ctx = contexts_[fd];
     ctx.fd = fd;
@@ -80,7 +80,7 @@ void EpollProactor::async_wait_read(int fd, std::function<void()> callback) {
     update_epoll(ctx);
 }
 
-void EpollProactor::async_wait_write(int fd, std::function<void()> callback) {
+void EpollProactor::async_wait_write(socket_t fd, std::function<void()> callback) {
     std::lock_guard<std::mutex> lock(ctx_mutex_);
     auto& ctx = contexts_[fd];
     ctx.fd = fd;
@@ -89,7 +89,7 @@ void EpollProactor::async_wait_write(int fd, std::function<void()> callback) {
     update_epoll(ctx);
 }
 
-void EpollProactor::async_sendfile(int out_fd, int in_fd, off_t offset, size_t count, std::function<void(ssize_t)> callback) {
+void EpollProactor::async_sendfile(socket_t out_fd, int in_fd, off_t offset, size_t count, std::function<void(ssize_t)> callback) {
     std::lock_guard<std::mutex> lock(ctx_mutex_);
     auto& ctx = contexts_[out_fd];
     ctx.fd = out_fd;
@@ -101,7 +101,7 @@ void EpollProactor::async_sendfile(int out_fd, int in_fd, off_t offset, size_t c
     update_epoll(ctx);
 }
 
-void EpollProactor::async_accept(int fd, std::function<void(int, sockaddr_in)> callback) {
+void EpollProactor::async_accept(socket_t fd, std::function<void(socket_t, sockaddr_in)> callback) {
     std::lock_guard<std::mutex> lock(ctx_mutex_);
     auto& ctx = contexts_[fd];
     ctx.fd = fd;
@@ -110,7 +110,7 @@ void EpollProactor::async_accept(int fd, std::function<void(int, sockaddr_in)> c
     update_epoll(ctx);
 }
 
-void EpollProactor::async_connect(int fd, const sockaddr_in& addr, std::function<void(int)> callback) {
+void EpollProactor::async_connect(socket_t fd, const sockaddr_in& addr, std::function<void(int)> callback) {
     if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == 0) {
         callback(0); // Immediately connected
         return;
@@ -128,7 +128,7 @@ void EpollProactor::async_connect(int fd, const sockaddr_in& addr, std::function
     update_epoll(ctx);
 }
 
-void EpollProactor::remove(int fd) {
+void EpollProactor::remove(socket_t fd) {
     std::lock_guard<std::mutex> lock(ctx_mutex_);
     auto it = contexts_.find(fd);
     if (it != contexts_.end()) {

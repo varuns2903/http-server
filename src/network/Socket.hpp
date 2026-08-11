@@ -1,5 +1,5 @@
 #pragma once
-#include <unistd.h>
+#include "PlatformSocket.hpp"
 
 namespace network {
 
@@ -9,7 +9,7 @@ public:
     Socket();
     
     // Wrap an existing socket file descriptor
-    explicit Socket(int fd);
+    explicit Socket(socket_t fd);
     
     // Destructor: Closes the socket to prevent leaks (RAII)
     ~Socket();
@@ -22,7 +22,7 @@ public:
     Socket(Socket&& other) noexcept;
     Socket& operator=(Socket&& other) noexcept;
 
-    int fd() const;
+    socket_t fd() const;
     bool is_valid() const;
     void close();
     
@@ -30,7 +30,7 @@ public:
     void set_non_blocking();
 
 private:
-    int fd_;
+    socket_t fd_;
 };
 
 } // namespace network

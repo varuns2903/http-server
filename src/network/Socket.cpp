@@ -1,66 +1,55 @@
 #include "Socket.hpp"
-#include <sys/socket.h>
 #include <stdexcept>
 #include <string>
 #include <cerrno>
 #include <cstring>
-#include <fcntl.h>
-#include <unistd.h>
 
 namespace network {
 
 Socket::Socket() {
-    fd_ = socket(AF_INET, SOCK_STREAM, 0);
-    if (fd_ == -1) {
-        throw std::runtime_error(std::string("Failed to create socket: ") + std::strerror(errno));
+    fd_ = ::socket(AF_INET, SOCK_STREAM, 0);
+    if (fd_ == INVALID_SOCKET_FD) {
+        throw std::runtime_error(std::string("Failed to create socket: ") + std::to_string(get_last_socket_error()));
     }
 }
 
-Socket::Socket(int fd) : fd_(fd) {}
+Socket::Socket(socket_t fd) : fd_(fd) {}
 
 Socket::~Socket() {
     close();
 }
 
 Socket::Socket(Socket&& other) noexcept : fd_(other.fd_) {
-    other.fd_ = -1;
+    other.fd_ = INVALID_SOCKET_FD;
 }
 
 Socket& Socket::operator=(Socket&& other) noexcept {
     if (this != &other) {
         close();
         fd_ = other.fd_;
-        other.fd_ = -1;
+        other.fd_ = INVALID_SOCKET_FD;
     }
     return *this;
 }
 
-int Socket::fd() const {
+socket_t Socket::fd() const {
     return fd_;
 }
 
 bool Socket::is_valid() const {
-    return fd_ != -1;
+    return fd_ != INVALID_SOCKET_FD;
 }
 
 void Socket::close() {
-    if (fd_ != -1) {
-        ::close(fd_);
-        fd_ = -1;
+    if (fd_ != INVALID_SOCKET_FD) {
+        close_socket(fd_);
+        fd_ = INVALID_SOCKET_FD;
     }
 }
 
 void Socket::set_non_blocking() {
-    if (fd_ == -1) return;
-
-    int flags = fcntl(fd_, F_GETFL, 0);
-    if (flags == -1) {
-        throw std::runtime_error(std::string("fcntl F_GETFL failed: ") + std::strerror(errno));
-    }
-
-    if (fcntl(fd_, F_SETFL, flags | O_NONBLOCK) == -1) {
-        throw std::runtime_error(std::string("fcntl F_SETFL O_NONBLOCK failed: ") + std::strerror(errno));
-    }
+    if (fd_ == INVALID_SOCKET_FD) return;
+    network::set_non_blocking(fd_);
 }
 
 } // namespace network

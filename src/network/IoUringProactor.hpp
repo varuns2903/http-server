@@ -13,15 +13,15 @@ public:
 
     void run_once(int timeout_ms) override;
 
-    void async_read(int fd, void* buffer, size_t size, std::function<void(ssize_t)> callback) override;
-    void async_write(int fd, const void* buffer, size_t size, std::function<void(ssize_t)> callback) override;
-    void async_wait_read(int fd, std::function<void()> callback) override;
-    void async_wait_write(int fd, std::function<void()> callback) override;
-    void async_sendfile(int out_fd, int in_fd, off_t offset, size_t count, std::function<void(ssize_t)> callback) override;
-    void async_accept(int fd, std::function<void(int, sockaddr_in)> callback) override;
-    void async_connect(int fd, const sockaddr_in& addr, std::function<void(int)> callback) override;
+    void async_read(socket_t fd, void* buffer, size_t size, std::function<void(ssize_t)> callback) override;
+    void async_write(socket_t fd, const void* buffer, size_t size, std::function<void(ssize_t)> callback) override;
+    void async_wait_read(socket_t fd, std::function<void()> callback) override;
+    void async_wait_write(socket_t fd, std::function<void()> callback) override;
+    void async_sendfile(socket_t out_fd, int in_fd, off_t offset, size_t count, std::function<void(ssize_t)> callback) override;
+    void async_accept(socket_t fd, std::function<void(socket_t, sockaddr_in)> callback) override;
+    void async_connect(socket_t fd, const sockaddr_in& addr, std::function<void(int)> callback) override;
 
-    void remove(int fd) override;
+    void remove(socket_t fd) override;
 
 private:
     struct io_uring ring_;
@@ -43,7 +43,7 @@ private:
 
         std::function<void(ssize_t)> io_cb;
         std::function<void()> wait_cb;
-        std::function<void(int, sockaddr_in)> accept_cb;
+        std::function<void(socket_t, sockaddr_in)> accept_cb;
         std::function<void(int)> connect_cb;
         
         sockaddr_in client_addr{};

@@ -8,7 +8,7 @@ namespace network {
 
 UdpSocket::UdpSocket() : Socket(::socket(AF_INET, SOCK_DGRAM, 0)) {
     if (!is_valid()) {
-        throw std::runtime_error(std::string("Failed to create UDP socket: ") + std::strerror(errno));
+        throw std::runtime_error(std::string("Failed to create UDP socket: ") + std::to_string(network::get_last_socket_error()));
     }
 }
 
@@ -20,11 +20,15 @@ void UdpSocket::bind(int port) {
     
     // Allow address reuse
     int opt = 1;
+#ifdef _WIN32
+    setsockopt(fd(), SOL_SOCKET, SO_REUSEADDR, (const char*)&opt, sizeof(opt));
+#else
     setsockopt(fd(), SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
     setsockopt(fd(), SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt));
+#endif
 
-    if (::bind(fd(), (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1) {
-        throw std::runtime_error(std::string("Failed to bind UDP socket: ") + std::strerror(errno));
+    if (::bind(fd(), (struct sockaddr*)&server_addr, sizeof(server_addr)) == network::SOCKET_ERROR_VAL) {
+        throw std::runtime_error(std::string("Failed to bind UDP socket: ") + std::to_string(network::get_last_socket_error()));
     }
 }
 

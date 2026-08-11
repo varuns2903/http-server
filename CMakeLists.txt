@@ -49,6 +49,7 @@ else()
 endif()
 
 add_library(server_core STATIC
+    src/network/PlatformSocket.cpp
     src/network/Socket.cpp
     src/network/ConnectionPool.cpp
     src/network/TlsContext.cpp

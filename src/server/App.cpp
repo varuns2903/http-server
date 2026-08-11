@@ -1,6 +1,8 @@
 #include "App.hpp"
 #include "../utils/Logger.hpp"
 #include "../utils/PrometheusRegistry.hpp"
+#include "../network/ConnectionPool.hpp"
+#include "../network/PlatformSocket.hpp"
 #include <csignal>
 #include <cstring>
 #include <unistd.h>
@@ -24,6 +26,7 @@ void signal_handler(int signum) {
 }
 
 App::App(const config::ServerConfig& config) : config_(config) {
+    network::initialize_platform_networking();
     utils::Logger::init(config.log_level);
     if (!config_.ssl_cert.empty() && !config_.ssl_key.empty()) {
         tls_context_ = std::make_unique<network::TlsContext>(config_.ssl_cert, config_.ssl_key);
@@ -32,6 +35,7 @@ App::App(const config::ServerConfig& config) : config_(config) {
 
 App::~App() {
     stop();
+    network::cleanup_platform_networking();
 }
 
 void App::on_error(routing::ErrorHandler handler) {

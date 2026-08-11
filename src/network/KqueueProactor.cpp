@@ -39,7 +39,7 @@ void KqueueProactor::update_kqueue(Context& ctx) {
     ctx.tracked = true;
 }
 
-void KqueueProactor::remove(int fd) {
+void KqueueProactor::remove(socket_t fd) {
     std::lock_guard<std::mutex> lock(ctx_mutex_);
     auto it = contexts_.find(fd);
     if (it != contexts_.end()) {
@@ -141,7 +141,7 @@ void KqueueProactor::handle_event(const struct kevent& event) {
 }
 
 // Setup methods (they mostly just set the state and call update_kqueue)
-void KqueueProactor::async_read(int fd, void* buffer, size_t size, std::function<void(ssize_t)> callback) {
+void KqueueProactor::async_read(socket_t fd, void* buffer, size_t size, std::function<void(ssize_t)> callback) {
     std::lock_guard<std::mutex> lock(ctx_mutex_);
     auto& ctx = contexts_[fd];
     ctx.fd = fd;
@@ -152,7 +152,7 @@ void KqueueProactor::async_read(int fd, void* buffer, size_t size, std::function
     update_kqueue(ctx);
 }
 
-void KqueueProactor::async_write(int fd, const void* buffer, size_t size, std::function<void(ssize_t)> callback) {
+void KqueueProactor::async_write(socket_t fd, const void* buffer, size_t size, std::function<void(ssize_t)> callback) {
     std::lock_guard<std::mutex> lock(ctx_mutex_);
     auto& ctx = contexts_[fd];
     ctx.fd = fd;
@@ -163,7 +163,7 @@ void KqueueProactor::async_write(int fd, const void* buffer, size_t size, std::f
     update_kqueue(ctx);
 }
 
-void KqueueProactor::async_wait_read(int fd, std::function<void()> callback) {
+void KqueueProactor::async_wait_read(socket_t fd, std::function<void()> callback) {
     std::lock_guard<std::mutex> lock(ctx_mutex_);
     auto& ctx = contexts_[fd];
     ctx.fd = fd;
@@ -172,7 +172,7 @@ void KqueueProactor::async_wait_read(int fd, std::function<void()> callback) {
     update_kqueue(ctx);
 }
 
-void KqueueProactor::async_wait_write(int fd, std::function<void()> callback) {
+void KqueueProactor::async_wait_write(socket_t fd, std::function<void()> callback) {
     std::lock_guard<std::mutex> lock(ctx_mutex_);
     auto& ctx = contexts_[fd];
     ctx.fd = fd;
@@ -181,7 +181,7 @@ void KqueueProactor::async_wait_write(int fd, std::function<void()> callback) {
     update_kqueue(ctx);
 }
 
-void KqueueProactor::async_sendfile(int out_fd, int in_fd, off_t offset, size_t count, std::function<void(ssize_t)> callback) {
+void KqueueProactor::async_sendfile(socket_t out_fd, int in_fd, off_t offset, size_t count, std::function<void(ssize_t)> callback) {
     std::lock_guard<std::mutex> lock(ctx_mutex_);
     auto& ctx = contexts_[out_fd];
     ctx.fd = out_fd;
@@ -193,7 +193,7 @@ void KqueueProactor::async_sendfile(int out_fd, int in_fd, off_t offset, size_t 
     update_kqueue(ctx);
 }
 
-void KqueueProactor::async_accept(int fd, std::function<void(int, sockaddr_in)> callback) {
+void KqueueProactor::async_accept(socket_t fd, std::function<void(socket_t, sockaddr_in)> callback) {
     std::lock_guard<std::mutex> lock(ctx_mutex_);
     auto& ctx = contexts_[fd];
     ctx.fd = fd;
@@ -202,7 +202,7 @@ void KqueueProactor::async_accept(int fd, std::function<void(int, sockaddr_in)> 
     update_kqueue(ctx);
 }
 
-void KqueueProactor::async_connect(int fd, const sockaddr_in& addr, std::function<void(int)> callback) {
+void KqueueProactor::async_connect(socket_t fd, const sockaddr_in& addr, std::function<void(int)> callback) {
     int ret = ::connect(fd, (const struct sockaddr*)&addr, sizeof(addr));
     if (ret == 0) {
         if (callback) callback(0);

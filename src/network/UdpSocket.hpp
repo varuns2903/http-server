@@ -1,8 +1,6 @@
 #pragma once
 #include "Socket.hpp"
 #include <string>
-#include <sys/socket.h>
-#include <netinet/in.h>
 
 namespace network {
 
