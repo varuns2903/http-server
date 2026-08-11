@@ -1,4 +1,5 @@
 #include "QuicConnectionManager.hpp"
+#include "QuicConnection.hpp"
 #include "../utils/PrometheusRegistry.hpp"
 #include <iostream>
 #include <cstring>
@@ -7,6 +8,9 @@ namespace server {
 
 QuicConnectionManager::QuicConnectionManager(network::UdpSocket& socket, SSL_CTX* ssl_ctx)
     : socket_(socket), ssl_ctx_(ssl_ctx) {
+    if (NGTCP2_CRYPTO_CONFIGURE_SERVER_CONTEXT(ssl_ctx_) != 0) {
+        std::cerr << "Failed to configure QUIC server context\n";
+    }
 }
 
 QuicConnectionManager::~QuicConnectionManager() {
