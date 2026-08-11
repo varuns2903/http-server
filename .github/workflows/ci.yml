@@ -1,0 +1,53 @@
+name: Orbit CI/CD
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    name: Build & Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive
+
+    - name: Install Dependencies (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake g++ libssl-dev libpq-dev libhiredis-dev pkg-config
+        sudo apt-get install -y libnghttp2-dev liburing-dev
+        # Depending on ubuntu version, ngtcp2 and nghttp3 might need to be built from source or fetched via vcpkg
+        # We will attempt apt-get first. If it fails, we will dynamically install it.
+        sudo apt-get install -y libngtcp2-dev libngtcp2-crypto-openssl-dev libnghttp3-dev || echo "Skipping ngtcp2 apt install, might fail in CMake"
+
+    - name: Install Dependencies (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew update
+        brew install cmake openssl postgresql hiredis pkg-config nghttp2 ngtcp2 nghttp3
+
+    - name: Configure CMake
+      run: |
+        mkdir build
+        cd build
+        cmake -DCMAKE_BUILD_TYPE=Release ..
+
+    - name: Build Framework
+      run: |
+        cd build
+        make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
+
+    - name: Run Tests
+      run: |
+        cd build
+        ./http_server_tests
