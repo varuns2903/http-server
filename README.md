@@ -49,8 +49,9 @@
 | **HTTP/1.1 & HTTP/2** | 🟢 Active | **Routing (Express-style)** | 🟢 Active |
 | **HTTP/3 & QUIC** | 🟢 Active | **WebSockets (RFC-compliant)**| 🟢 Active |
 | **Zero-Downtime Reload**| 🟢 Active | **Middleware Stack** | 🟢 Active |
-| **Prometheus Metrics** | 🟢 Active | **Database (Redis/PG)** | 🟢 Active |
+| **Prometheus Metrics** | 🟢 Active | **Database (Redis/PG/Coro)** | 🟢 Active |
 | **TLS/SSL Encryption** | 🟢 Active | **Static File Server** | 🟢 Active |
+| **Connection Pooling** | 🟢 Active | **JSON Schema Validation** | 🟢 Active |
 
 ### 💻 Terminal: Quick Start
 
@@ -76,37 +77,43 @@ root@orbit-server:~/build# ./basic_server --port 3000 --engine io_uring
       
 ```cpp
 #include "server/App.hpp"
-#include "middleware/Cors.hpp"
-#include "middleware/Metrics.hpp"
-#include "middleware/RateLimiter.hpp"
+#include "middleware/Validation.hpp"
+#include "database/PostgresCoro.hpp"
+#include "concurrency/Task.hpp"
+
+using namespace server;
+using namespace http;
+using namespace middleware;
 
 int main() {
-    server::App app;
+    App app;
 
-    // 🛡️ Apply Global Middlewares
-    app.use(middleware::Cors::allow_all());
-    app.use(middleware::Metrics::track());
-    app.use(middleware::rate_limit(100, std::chrono::seconds(10)));
-    
-    // 📊 Enable Prometheus /metrics endpoint
-    app.enable_metrics(); 
-
-    // 🛣️ Create Route Group
-    auto api = app.group("/api/v1");
-
-    // ⚡ Dynamic Routing with Parameter Extraction
-    api->get("/users/:id", [](http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> res) {
-        res->json({
-            {"status", "success"}, 
-            {"user_id", req.params["id"]}
-        });
+    // 🛡️ Global Error Handler
+    app.on_error([](const std::exception& e, HttpRequest& req, std::shared_ptr<ResponseWriter> writer) {
+        writer->send(HttpResponse().status(HttpStatus::InternalServerError).send("Crash prevented!"));
     });
 
-    // 🚀 Start the server
-    app.listen(3000, []() {
-        std::cout << "Server listening on port 3000!" << std::endl;
+    // ⚡ Automated JSON Validation
+    std::vector<SchemaField> user_schema = {
+        {"username", JsonType::STRING, true},
+        {"age", JsonType::NUMBER, true}
+    };
+
+    app.post("/users", {validate_json(user_schema)}, [](HttpRequest& req, std::shared_ptr<ResponseWriter> res) {
+        std::string username = req.json()["username"];
+        res->json({{"status", "created"}, {"username", username}});
     });
 
+    // 🚀 C++20 Coroutines (Non-Blocking async/await)
+    app.get("/db", [](HttpRequest& req, std::shared_ptr<ResponseWriter> res) -> concurrency::Task {
+        auto pg = std::make_shared<database::PostgresClient>(&res->proactor(), "dbname=postgres");
+        if (co_await database::connect_async(pg)) {
+            PGresult* db_res = co_await database::query_async(pg, "SELECT current_timestamp;");
+            res->send(HttpResponse().status(HttpStatus::OK).send("DB Time: " + std::string(PQgetvalue(db_res, 0, 0))));
+        }
+    });
+
+    app.listen(3000, []() { std::cout << "Listening on port 3000!" << std::endl; });
     return 0;
 }
 ```
