@@ -75,11 +75,15 @@ public:
             addr.sin_addr = *(struct in_addr*)he->h_addr_list[0];
 
             // 2. Create socket
-            self->fd_ = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
+            self->fd_ = socket(AF_INET, SOCK_STREAM, 0);
             if (self->fd_ < 0) {
                 self->fail("Failed to create socket");
                 return;
             }
+            fcntl(self->fd_, F_SETFL, fcntl(self->fd_, F_GETFL, 0) | O_NONBLOCK);
+#ifdef FD_CLOEXEC
+            fcntl(self->fd_, F_SETFD, fcntl(self->fd_, F_GETFD, 0) | FD_CLOEXEC);
+#endif
 
             // 3. Connect asynchronously (thread-safe on Proactor)
             self->proactor_.async_connect(self->fd_, addr, [self](int status) {

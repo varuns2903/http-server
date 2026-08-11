@@ -23,8 +23,9 @@ jobs:
     - name: Install Dependencies (Ubuntu)
       if: matrix.os == 'ubuntu-latest'
       env:
-        PKG_CONFIG_PATH: /usr/local/quictls/lib/pkgconfig
-        OPENSSL_ROOT_DIR: /usr/local/quictls
+        PKG_CONFIG_PATH: /usr/local/ssl/lib/pkgconfig
+        OPENSSL_ROOT_DIR: /usr/local/ssl
+        LD_LIBRARY_PATH: /usr/local/ssl/lib
       run: |
         sudo apt-get update
         sudo apt-get install -y cmake g++ libpq-dev libhiredis-dev pkg-config zlib1g-dev
@@ -40,6 +41,10 @@ jobs:
         cd ..
         echo "/usr/local/ssl/lib" | sudo tee /etc/ld.so.conf.d/openssl.conf
         sudo ldconfig
+        
+        echo "LD_LIBRARY_PATH=/usr/local/ssl/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+        echo "PKG_CONFIG_PATH=/usr/local/ssl/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+        echo "OPENSSL_ROOT_DIR=/usr/local/ssl" >> $GITHUB_ENV
 
         # Build nghttp3
         git clone --depth 1 --branch v1.6.0 https://github.com/ngtcp2/nghttp3.git
