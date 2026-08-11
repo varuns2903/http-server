@@ -11,7 +11,6 @@ public:
     // Returns std::nullopt if the request is malformed.
     static std::optional<HttpRequest> parse(std::string_view raw_request);
 
-private:
     static HttpMethod parse_method(std::string_view method_str);
 };
 

@@ -63,6 +63,9 @@ void Connection::on_read_complete(ssize_t bytes_read) {
         if (state_ == ConnectionState::RAW_STREAM && raw_stream_on_close_) {
             raw_stream_on_close_();
         }
+        if (state_ == ConnectionState::HTTP_STREAMING_BODY && body_stream_on_end_) {
+            body_stream_on_end_();
+        }
         std::cout << "on_read_complete closed with bytes_read=" << bytes_read << std::endl;
         manager_.remove_connection(socket_.fd());
         return;
@@ -145,6 +148,12 @@ void Connection::on_read_complete(ssize_t bytes_read) {
         return;
     }
     
+    if (state_ == ConnectionState::HTTP_STREAMING_BODY) {
+        process_streaming_data();
+        trigger_read();
+        return;
+    }
+    
     if (state_ == ConnectionState::WEBSOCKET) {
         if (ws_connection_) {
             std::lock_guard<std::mutex> lock(read_mutex_);
@@ -172,13 +181,21 @@ void Connection::on_read_complete(ssize_t bytes_read) {
     
     RequestState state = check_request_state();
     
-    if (state == RequestState::COMPLETE) {
+    if (state == RequestState::COMPLETE || state == RequestState::HEADERS_COMPLETE) {
         if (!is_processing_request_) {
             is_processing_request_ = true;
+            if (state == RequestState::HEADERS_COMPLETE) {
+                state_ = ConnectionState::HTTP_STREAMING_BODY;
+            }
             auto self = shared_from_this();
             thread_pool_.enqueue([self]() {
                 self->process_request();
             });
+            
+            // For streaming bodies, we must continue reading asynchronously
+            if (state == RequestState::HEADERS_COMPLETE) {
+                trigger_read();
+            }
         }
     } else if (state == RequestState::ERROR_PAYLOAD_TOO_LARGE) {
         send_error(http::HttpStatus::PayloadTooLarge, "413 Payload Too Large");
@@ -272,9 +289,14 @@ void Connection::process_request() {
         size_t headers_end = raw_request.find("\r\n\r\n");
         size_t consumed_bytes = headers_end + 4;
         
-        auto cl_it = req.headers.find("Content-Length");
-        if (cl_it != req.headers.end()) {
-            consumed_bytes += std::stoull(std::string(cl_it->second));
+        if (state_ != ConnectionState::HTTP_STREAMING_BODY) {
+            auto cl_it = req.headers.find("Content-Length");
+            if (cl_it != req.headers.end()) {
+                consumed_bytes += std::stoull(std::string(cl_it->second));
+            } else if (req.headers.find("Transfer-Encoding") != req.headers.end()) {
+                // If chunked and not streaming, consume everything
+                consumed_bytes = read_buffer_.size();
+            }
         }
         
         {
@@ -524,17 +546,22 @@ void Connection::trigger_write() {
         if (!tls_write_buffer_.empty()) {
             auto self = shared_from_this();
             proactor_.async_write(socket_.fd(), tls_write_buffer_.data(), tls_write_buffer_.size(), [self](ssize_t written) {
-                self->is_writing_ = false;
                 self->on_write_complete(written);
             });
             return; // Will clear flag in callback
         }
     } else {
         std::lock_guard<std::mutex> lock(write_mutex_);
-        if (!write_buffer_.empty()) {
+        
+        // Move data from write_buffer_ to active_write_buffer_ if active is empty
+        if (active_write_buffer_.empty() && !write_buffer_.empty()) {
+            active_write_buffer_ = std::move(write_buffer_);
+            write_buffer_.clear();
+        }
+        
+        if (!active_write_buffer_.empty()) {
             auto self = shared_from_this();
-            proactor_.async_write(socket_.fd(), write_buffer_.data(), write_buffer_.size(), [self](ssize_t written) {
-                self->is_writing_ = false;
+            proactor_.async_write(socket_.fd(), active_write_buffer_.data(), active_write_buffer_.size(), [self](ssize_t written) {
                 self->on_write_complete(written);
             });
             return;
@@ -543,7 +570,6 @@ void Connection::trigger_write() {
         if (file_fd_ != -1 && file_size_ > file_offset_) {
             auto self = shared_from_this();
             proactor_.async_sendfile(socket_.fd(), file_fd_, file_offset_, static_cast<size_t>(file_size_ - file_offset_), [self](ssize_t written) {
-                self->is_writing_ = false;
                 self->on_sendfile_complete(written);
             });
             return;
@@ -574,9 +600,14 @@ void Connection::on_write_complete(ssize_t bytes_written) {
         tls_write_buffer_.erase(tls_write_buffer_.begin(), tls_write_buffer_.begin() + bytes_written);
     } else {
         std::lock_guard<std::mutex> lock(write_mutex_);
-        write_buffer_.erase(write_buffer_.begin(), write_buffer_.begin() + bytes_written);
+        if (static_cast<size_t>(bytes_written) <= active_write_buffer_.size()) {
+            active_write_buffer_.erase(active_write_buffer_.begin(), active_write_buffer_.begin() + bytes_written);
+        } else {
+            active_write_buffer_.clear();
+        }
     }
     
+    is_writing_ = false;
     trigger_write(); // Try writing again if needed
 }
 
@@ -589,6 +620,7 @@ void Connection::on_sendfile_complete(ssize_t bytes_written) {
     reset_timer();
     file_offset_ += bytes_written;
     
+    is_writing_ = false;
     trigger_write();
 }
 
@@ -625,7 +657,84 @@ void Connection::upgrade_to_raw_stream(std::function<void(std::string_view)> on_
     trigger_read();
 }
 
-RequestState Connection::check_request_state() const {
+void Connection::read_body_stream(std::function<void(std::string_view)> on_data, std::function<void()> on_end) {
+    body_stream_on_data_ = std::move(on_data);
+    body_stream_on_end_ = std::move(on_end);
+    process_streaming_data();
+}
+
+void Connection::process_streaming_data() {
+    std::lock_guard<std::mutex> lock(read_mutex_);
+    if (read_buffer_.empty()) return;
+    
+    // Do not consume data until the handler has registered the callback!
+    if (!body_stream_on_data_) return;
+    
+    if (is_chunked_) {
+        while (!read_buffer_.empty()) {
+            if (is_chunk_header_mode_) {
+                std::string_view buf(read_buffer_.data(), read_buffer_.size());
+                size_t crlf = buf.find("\r\n");
+                if (crlf == std::string_view::npos) break; 
+                
+                std::string_view hex_str = buf.substr(0, crlf);
+                try {
+                    chunk_bytes_remaining_ = std::stoull(std::string(hex_str), nullptr, 16);
+                } catch (...) { break; }
+                
+                read_buffer_.erase(read_buffer_.begin(), read_buffer_.begin() + crlf + 2);
+                is_chunk_header_mode_ = false;
+                
+                if (chunk_bytes_remaining_ == 0) {
+                    if (body_stream_on_end_) {
+                        auto on_end = std::move(body_stream_on_end_);
+                        on_end();
+                    }
+                    if (read_buffer_.size() >= 2) read_buffer_.erase(read_buffer_.begin(), read_buffer_.begin() + 2);
+                    break;
+                }
+            } else {
+                size_t available = read_buffer_.size();
+                size_t to_read = std::min(available, chunk_bytes_remaining_);
+                if (to_read > 0 && body_stream_on_data_) {
+                    body_stream_on_data_(std::string_view(read_buffer_.data(), to_read));
+                }
+                read_buffer_.erase(read_buffer_.begin(), read_buffer_.begin() + to_read);
+                chunk_bytes_remaining_ -= to_read;
+                
+                if (chunk_bytes_remaining_ == 0) {
+                    if (read_buffer_.size() >= 2) {
+                        read_buffer_.erase(read_buffer_.begin(), read_buffer_.begin() + 2);
+                        is_chunk_header_mode_ = true;
+                    } else if (read_buffer_.size() == 1 && read_buffer_[0] == '\r') {
+                        break;
+                    } else if (read_buffer_.empty()) {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
+    } else {
+        size_t available = read_buffer_.size();
+        size_t to_read = std::min(available, content_length_remaining_);
+        if (to_read > 0 && body_stream_on_data_) {
+            body_stream_on_data_(std::string_view(read_buffer_.data(), to_read));
+        }
+        read_buffer_.erase(read_buffer_.begin(), read_buffer_.begin() + to_read);
+        
+        if (content_length_remaining_ != static_cast<size_t>(-1)) {
+            content_length_remaining_ -= to_read;
+            if (content_length_remaining_ == 0 && body_stream_on_end_) {
+                auto on_end = std::move(body_stream_on_end_);
+                on_end();
+            }
+        }
+    }
+}
+
+RequestState Connection::check_request_state() {
     std::lock_guard<std::mutex> lock(read_mutex_);
     std::string_view buf_view(read_buffer_.data(), read_buffer_.size());
     size_t headers_end = buf_view.find("\r\n\r\n");
@@ -643,6 +752,70 @@ RequestState Connection::check_request_state() const {
     if (first_line_end != std::string_view::npos && first_line_end > 4096) {
         return RequestState::ERROR_HEADERS_TOO_LARGE;
     }
+    
+    // -------------------------------------------------------------
+    // Check if this route is a STREAM route. If so, return HEADERS_COMPLETE
+    // -------------------------------------------------------------
+    if (first_line_end != std::string_view::npos) {
+        std::string_view request_line = buf_view.substr(0, first_line_end);
+        size_t space1 = request_line.find(' ');
+        size_t space2 = request_line.find(' ', space1 + 1);
+        if (space1 != std::string_view::npos && space2 != std::string_view::npos && space1 != space2) {
+            http::HttpMethod method = http::HttpParser::parse_method(request_line.substr(0, space1));
+            std::string_view full_uri = request_line.substr(space1 + 1, space2 - space1 - 1);
+            std::string uri;
+            size_t q_mark = full_uri.find('?');
+            if (q_mark != std::string_view::npos) {
+                uri = std::string(full_uri.substr(0, q_mark));
+            } else {
+                uri = std::string(full_uri);
+            }
+            
+            if (router_.is_stream_route(method, uri)) {
+                std::string_view raw_request = buf_view.substr(0, headers_end + 4);
+                
+                auto ci_find = [](std::string_view haystack, std::string_view needle) -> size_t {
+                    auto it = std::search(haystack.begin(), haystack.end(), needle.begin(), needle.end(), [](char ch1, char ch2) {
+                        return std::tolower(static_cast<unsigned char>(ch1)) == std::tolower(static_cast<unsigned char>(ch2));
+                    });
+                    if (it != haystack.end()) {
+                        return std::distance(haystack.begin(), it);
+                    }
+                    return std::string_view::npos;
+                };
+                
+                if (ci_find(raw_request, "transfer-encoding") != std::string_view::npos) {
+                    is_chunked_ = true;
+                    is_chunk_header_mode_ = true;
+                } else {
+                    is_chunked_ = false;
+                    size_t cl_pos = ci_find(raw_request, "content-length:");
+                    if (cl_pos != std::string_view::npos) {
+                        size_t end_of_line = raw_request.find("\r\n", cl_pos);
+                        std::string_view cl_str = raw_request.substr(cl_pos + 15, end_of_line - cl_pos - 15);
+                        
+                        // Trim spaces
+                        while (!cl_str.empty() && cl_str.front() == ' ') cl_str.remove_prefix(1);
+                        
+                        if (!cl_str.empty()) {
+                            try {
+                                content_length_remaining_ = std::stoull(std::string(cl_str));
+                            } catch (...) {
+                                content_length_remaining_ = static_cast<size_t>(-1);
+                            }
+                        } else {
+                            content_length_remaining_ = static_cast<size_t>(-1);
+                        }
+                    } else {
+                        content_length_remaining_ = static_cast<size_t>(-1);
+                    }
+                }
+                
+                return RequestState::HEADERS_COMPLETE;
+            }
+        }
+    }
+    // -------------------------------------------------------------
     
     auto ci_find = [](std::string_view haystack, std::string_view needle) -> size_t {
         auto it = std::search(haystack.begin(), haystack.end(), needle.begin(), needle.end(), [](char ch1, char ch2) {

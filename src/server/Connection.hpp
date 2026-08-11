@@ -20,6 +20,7 @@ class ConnectionManager; // Forward declaration
 
 enum class ConnectionState {
     HTTP,
+    HTTP_STREAMING_BODY,
     WEBSOCKET,
     RAW_STREAM,
     HTTP2
@@ -28,6 +29,7 @@ enum class ConnectionState {
 enum class RequestState {
     INCOMPLETE,
     COMPLETE,
+    HEADERS_COMPLETE,
     ERROR_PAYLOAD_TOO_LARGE,
     ERROR_HEADERS_TOO_LARGE
 };
@@ -58,6 +60,7 @@ public:
     void end() override;
     void send_sse_event(std::string_view data, std::string_view event = "", std::string_view id = "") override;
     void upgrade_to_raw_stream(std::function<void(std::string_view)> on_data, std::function<void()> on_close) override;
+    void read_body_stream(std::function<void(std::string_view)> on_data, std::function<void()> on_end) override;
 
 private:
     void process_request();
@@ -70,6 +73,7 @@ private:
     void trigger_write();
     void on_write_complete(ssize_t bytes_written);
     void on_sendfile_complete(ssize_t bytes_written);
+    void process_streaming_data();
 
     network::Socket socket_;
     std::string client_ip_;
@@ -82,6 +86,7 @@ private:
     std::vector<char> read_buffer_;
     mutable std::mutex read_mutex_;
     std::vector<char> write_buffer_;
+    std::vector<char> active_write_buffer_;
     mutable std::mutex write_mutex_;
     
     char async_read_buf_[16384]; // Buffer for kernel to write into asynchronously
@@ -91,8 +96,11 @@ private:
     std::atomic<bool> is_reading_{false};
     std::atomic<bool> is_writing_{false};
     bool is_chunked_{false};
+    bool is_chunk_header_mode_{true};
+    size_t chunk_bytes_remaining_{0};
+    size_t content_length_remaining_{0};
 
-    RequestState check_request_state() const;
+    RequestState check_request_state();
     bool should_close_{false};
     ConnectionState state_{ConnectionState::HTTP};
     uint64_t current_timer_id_{0};
@@ -115,6 +123,8 @@ private:
     std::shared_ptr<http::h2::Http2Session> h2_session_;
     std::function<void(std::string_view)> raw_stream_on_data_;
     std::function<void()> raw_stream_on_close_;
+    std::function<void(std::string_view)> body_stream_on_data_;
+    std::function<void()> body_stream_on_end_;
     std::vector<std::function<void(http::HttpResponse&)>> interceptors_;
 };
 

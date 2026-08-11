@@ -42,6 +42,9 @@ public:
 
     // Take over the connection for raw bi-directional byte streaming (e.g. WebSocket Proxying)
     virtual void upgrade_to_raw_stream(std::function<void(std::string_view)> on_data, std::function<void()> on_close) = 0;
+    
+    // Asynchronously stream the incoming HTTP request body
+    virtual void read_body_stream(std::function<void(std::string_view)> on_data, std::function<void()> on_end) = 0;
 };
 
 } // namespace http

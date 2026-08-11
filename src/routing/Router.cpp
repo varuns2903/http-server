@@ -53,16 +53,17 @@ void Router::group(const std::string& prefix, std::function<void(Router&)> callb
 void Router::add_route(http::HttpMethod method, const std::string& path, RouteHandler handler) {
     std::string full_path = prefix_ + path;
     
-    RouteHandler wrapped = handler;
+    // Wrap handler with local middlewares
+    RouteHandler wrapped = std::move(handler);
     if (!local_middlewares_.empty()) {
-        wrapped = [mws = local_middlewares_, h = std::move(handler)](http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> w) {
+        wrapped = [mws = local_middlewares_, h = std::move(wrapped)](http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> w) {
             for (auto& mw : mws) {
                 if (!mw(req, w)) return;
             }
             h(req, w);
         };
     }
-
+    
     if (parent_) {
         parent_->add_route(method, full_path, std::move(wrapped));
         return;
@@ -76,8 +77,133 @@ void Router::add_route(http::HttpMethod method, const std::string& path, RouteHa
         dynamic_routes_.push_back(std::move(dr));
     } else {
         std::string key = make_route_key(method, full_path);
+        std::cout << "[Router] Registered route: " << key << std::endl;
         routes_[key] = std::move(wrapped);
     }
+}
+
+void Router::add_route(http::HttpMethod method, const std::string& path, std::vector<Middleware> mws, RouteHandler handler) {
+    // Wrap the handler with the route-specific middlewares first
+    RouteHandler wrapped = [mws = std::move(mws), h = std::move(handler)](http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> w) {
+        for (auto& mw : mws) {
+            if (!mw(req, w)) return;
+        }
+        h(req, w);
+    };
+    // Delegate to standard add_route (which will wrap it with group middlewares)
+    add_route(method, path, std::move(wrapped));
+}
+
+Router& Router::get(const std::string& path, RouteHandler handler) {
+    add_route(http::HttpMethod::GET, path, std::move(handler));
+    return *this;
+}
+
+Router& Router::get(const std::string& path, std::vector<Middleware> mws, RouteHandler handler) {
+    add_route(http::HttpMethod::GET, path, std::move(mws), std::move(handler));
+    return *this;
+}
+
+Router& Router::post(const std::string& path, RouteHandler handler) {
+    add_route(http::HttpMethod::POST, path, std::move(handler));
+    return *this;
+}
+
+Router& Router::post(const std::string& path, std::vector<Middleware> mws, RouteHandler handler) {
+    add_route(http::HttpMethod::POST, path, std::move(mws), std::move(handler));
+    return *this;
+}
+
+Router& Router::put(const std::string& path, RouteHandler handler) {
+    add_route(http::HttpMethod::PUT, path, std::move(handler));
+    return *this;
+}
+
+Router& Router::put(const std::string& path, std::vector<Middleware> mws, RouteHandler handler) {
+    add_route(http::HttpMethod::PUT, path, std::move(mws), std::move(handler));
+    return *this;
+}
+
+Router& Router::patch(const std::string& path, RouteHandler handler) {
+    add_route(http::HttpMethod::PATCH, path, std::move(handler));
+    return *this;
+}
+
+Router& Router::patch(const std::string& path, std::vector<Middleware> mws, RouteHandler handler) {
+    add_route(http::HttpMethod::PATCH, path, std::move(mws), std::move(handler));
+    return *this;
+}
+
+Router& Router::del(const std::string& path, RouteHandler handler) {
+    add_route(http::HttpMethod::DELETE, path, std::move(handler));
+    return *this;
+}
+
+Router& Router::del(const std::string& path, std::vector<Middleware> mws, RouteHandler handler) {
+    add_route(http::HttpMethod::DELETE, path, std::move(mws), std::move(handler));
+    return *this;
+}
+
+Router& Router::options(const std::string& path, RouteHandler handler) {
+    add_route(http::HttpMethod::OPTIONS, path, std::move(handler));
+    return *this;
+}
+
+Router& Router::options(const std::string& path, std::vector<Middleware> mws, RouteHandler handler) {
+    add_route(http::HttpMethod::OPTIONS, path, std::move(mws), std::move(handler));
+    return *this;
+}
+
+void Router::add_stream_route(http::HttpMethod method, const std::string& path, RouteHandler handler) {
+    std::string full_path = prefix_ + path;
+    
+    if (parent_) {
+        parent_->add_stream_route(method, full_path, std::move(handler));
+        return;
+    }
+
+    if (full_path.find(':') != std::string::npos || full_path.find('*') != std::string::npos) {
+        DynamicRoute dr;
+        dr.method = method;
+        dr.path_segments = split_path(full_path);
+        dynamic_stream_routes_.push_back(std::move(dr));
+    } else {
+        std::string key = make_route_key(method, full_path);
+        stream_routes_.insert(key);
+    }
+    
+    // Also register it as a normal route so it gets executed
+    add_route(method, path, std::move(handler));
+}
+
+bool Router::is_stream_route(http::HttpMethod method, const std::string& path) const {
+    if (parent_) {
+        return parent_->is_stream_route(method, path);
+    }
+    
+    std::string route_key = make_route_key(method, path);
+    if (stream_routes_.find(route_key) != stream_routes_.end()) {
+        return true;
+    }
+    
+    auto req_segments = split_path(path);
+    for (const auto& dr : dynamic_stream_routes_) {
+        if (dr.method != method) continue;
+        if (req_segments.size() != dr.path_segments.size()) continue;
+        
+        bool matches = true;
+        for (size_t i = 0; i < dr.path_segments.size(); ++i) {
+            if (dr.path_segments[i].empty()) continue;
+            if (dr.path_segments[i][0] == ':') continue;
+            if (dr.path_segments[i] != req_segments[i]) {
+                matches = false;
+                break;
+            }
+        }
+        if (matches) return true;
+    }
+    
+    return false;
 }
 
 void Router::ws(const std::string& path, WsHandler handler) {
@@ -97,6 +223,14 @@ void Router::use(Middleware m) {
     }
 }
 
+void Router::on_error(ErrorHandler handler) {
+    if (parent_) {
+        parent_->on_error(std::move(handler));
+    } else {
+        error_handler_ = std::move(handler);
+    }
+}
+
 void Router::route(http::HttpRequest& request, std::shared_ptr<http::ResponseWriter> response_writer) const {
     try {
         // 1. Run global and route-specific middlewares
@@ -107,10 +241,12 @@ void Router::route(http::HttpRequest& request, std::shared_ptr<http::ResponseWri
         }
         
         std::string route_key = make_route_key(request.method, request.uri);
+        std::cout << "[Router] Trying to match route key: " << route_key << std::endl;
         
         // 2. Exact match check
         auto it = routes_.find(route_key);
         if (it != routes_.end()) {
+            std::cout << "[Router] Exact match found for " << route_key << std::endl;
             it->second(request, response_writer);
             return;
         }
@@ -150,12 +286,18 @@ void Router::route(http::HttpRequest& request, std::shared_ptr<http::ResponseWri
         response_writer->send(std::move(res));
         
     } catch (const std::exception& e) {
-        LOG_ERROR("Unhandled exception in route " << request.uri << ": " << e.what());
-        http::HttpResponse res;
-        res.status(http::HttpStatus::InternalServerError).send(
-            "500 Internal Server Error: " + std::string(e.what())
-        );
-        response_writer->send(std::move(res));
+        if (error_handler_) {
+            error_handler_(e, request, response_writer);
+        } else if (parent_ && parent_->error_handler_) {
+            parent_->error_handler_(e, request, response_writer);
+        } else {
+            LOG_ERROR("Unhandled exception in route " << request.uri << ": " << e.what());
+            http::HttpResponse res;
+            res.status(http::HttpStatus::InternalServerError).send(
+                "500 Internal Server Error: " + std::string(e.what())
+            );
+            response_writer->send(std::move(res));
+        }
     } catch (...) {
         LOG_ERROR("Unknown unhandled exception in route " << request.uri);
         http::HttpResponse res;

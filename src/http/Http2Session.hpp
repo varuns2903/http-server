@@ -93,6 +93,7 @@ public:
     void end() override;
     void send_sse_event(std::string_view data, std::string_view event = "", std::string_view id = "") override;
     void upgrade_to_raw_stream(std::function<void(std::string_view)> on_data, std::function<void()> on_close) override;
+    void read_body_stream(std::function<void(std::string_view)> on_data, std::function<void()> on_end) override;
 
 private:
     Http2Session* session_;

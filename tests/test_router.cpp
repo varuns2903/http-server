@@ -58,8 +58,8 @@ public:
     void end() override {}
     
     void send_sse_event(std::string_view, std::string_view, std::string_view) override {}
-
     void upgrade_to_raw_stream(std::function<void(std::string_view)>, std::function<void()>) override {}
+    void read_body_stream(std::function<void(std::string_view)>, std::function<void()>) override {}
 };
 
 TEST(RouterTest, RouteMatchAndNotFound) {

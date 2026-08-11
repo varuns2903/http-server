@@ -9,7 +9,10 @@
 #include "database/RedisClient.hpp"
 #include "database/PostgresClient.hpp"
 #include "config/Config.hpp"
+#include "http/MultipartForm.hpp"
+#include "http/MultipartStreamParser.hpp"
 #include "utils/Logger.hpp"
+#include "middleware/Proxy.hpp"
 #include <iostream>
 #include <csignal>
 
@@ -43,22 +46,6 @@ int main(int argc, char* argv[]) {
             return true;
         });
 
-        // Proxy Middleware for /proxy -> 127.0.0.1:8080
-        app.use([](http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> writer) {
-            if (req.uri.find("/proxy") == 0) {
-                auto proxy_mw = middleware::proxy("127.0.0.1", 8080);
-                return proxy_mw(req, writer);
-            }
-            return true;
-        });
-
-        // Proxy Middleware for /proxy -> 127.0.0.1:8080
-        app.use([](http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> writer) {
-            if (req.uri.find("/proxy") == 0) {
-                return middleware::proxy("127.0.0.1", 8080)(req, writer);
-            }
-            return true;
-        });
 
         // Setup global middlewares
         app.use(middleware::cors());
@@ -97,6 +84,92 @@ int main(int argc, char* argv[]) {
                 res.body = "User ID: " + req.params.at("id");
                 writer->send(std::move(res));
             });
+
+            api.add_stream_route(http::HttpMethod::POST, "/upload_multipart", [](http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> writer) {
+                auto ct_it = req.headers.find("Content-Type");
+                if (ct_it == req.headers.end() || !ct_it->second.starts_with("multipart/form-data")) {
+                    http::HttpResponse res;
+                    res.status(http::HttpStatus::BadRequest).send("Expected multipart/form-data");
+                    writer->send(std::move(res));
+                    return;
+                }
+
+                std::string_view ct = ct_it->second;
+                size_t b_pos = ct.find("boundary=");
+                if (b_pos == std::string::npos) {
+                    http::HttpResponse res;
+                    res.status(http::HttpStatus::BadRequest).send("No boundary found");
+                    writer->send(std::move(res));
+                    return;
+                }
+                
+                std::string boundary(ct.substr(b_pos + 9));
+                
+                // We use a shared_ptr for the parser because the callbacks might outlive this function context
+                auto parser = std::make_shared<http::MultipartStreamParser>(
+                    boundary,
+                    [](const std::string& name, const std::string& value) {
+                        std::cout << "[Upload] Field: " << name << " = " << value << std::endl;
+                    },
+                    [](const std::string& name, const std::string& filename, const std::string& content_type, const std::string& tmp_filepath) {
+                        std::cout << "[Upload] File saved: " << name << " -> " << tmp_filepath 
+                                  << " (" << filename << ", " << content_type << ")" << std::endl;
+                    }
+                );
+
+                writer->read_body_stream(
+                    [parser](std::string_view chunk) {
+                        parser->feed(chunk);
+                    },
+                    [writer, parser]() {
+                        parser->end();
+                        http::HttpResponse res;
+                        res.status(http::HttpStatus::OK).send("Upload processed successfully (Streaming)!");
+                        writer->send(std::move(res));
+                    }
+                );
+            });
+
+            api.add_stream_route(http::HttpMethod::POST, "/upload", [](http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> res) {
+                auto total_bytes = std::make_shared<size_t>(0);
+                
+                res->read_body_stream(
+                    [total_bytes](std::string_view chunk) {
+                        *total_bytes += chunk.size();
+                    },
+                    [res, total_bytes]() {
+                        http::HttpResponse response;
+                        response.status(http::HttpStatus::OK).send("Upload complete! Total bytes received: " + std::to_string(*total_bytes));
+                        res->send(std::move(response));
+                    }
+                );
+            });
+            
+            api.add_route(http::HttpMethod::GET, "/error", [](http::HttpRequest& /*req*/, std::shared_ptr<http::ResponseWriter> /*res*/) {
+                throw std::runtime_error("Simulated crash in API route!");
+            });
+            
+            // Custom Error Handler for this router group
+            api.on_error([](const std::exception& e, http::HttpRequest& /*req*/, std::shared_ptr<http::ResponseWriter> res) {
+                std::cout << "[Error Middleware] Caught exception: " << e.what() << std::endl;
+                http::HttpResponse response;
+                response.status(http::HttpStatus::InternalServerError);
+                response.headers["Content-Type"] = "application/json";
+                response.send("{\"error\": \"Custom API Error: " + std::string(e.what()) + "\"}");
+                res->send(std::move(response));
+            });
+        });
+
+        // Proxy/Load Balancer Group
+        app.group("/proxy", [](routing::Router& proxy_router) {
+            proxy_router.use(middleware::load_balancer({
+                {"httpbin.org", 80},
+                {"example.com", 80}
+            }));
+            
+            proxy_router.add_route(http::HttpMethod::GET, "/*", [](http::HttpRequest&, std::shared_ptr<http::ResponseWriter>) {
+                // Handled by middleware
+            });
         });
 
         // Fluent routing
@@ -120,6 +193,30 @@ int main(int argc, char* argv[]) {
             ws.on_close([]() {
                 std::cout << "WS connection closed." << std::endl;
             });
+        })
+        .get("/sse", [](const http::HttpRequest& /*req*/, std::shared_ptr<http::ResponseWriter> writer) {
+            http::HttpResponse res;
+            res.status(http::HttpStatus::OK);
+            res.headers["Content-Type"] = "text/event-stream";
+            res.headers["Cache-Control"] = "no-cache";
+            res.headers["Connection"] = "keep-alive";
+            res.headers["Transfer-Encoding"] = "chunked";
+            
+            // Send headers first
+            writer->send_headers(res);
+            
+            // Send initial SSE event
+            writer->send_sse_event("Connected to Orbit SSE!", "hello");
+            
+            // We'll simulate pushing some background events by spinning up a thread
+            // In a real application, you'd register this writer in a connection manager
+            std::thread([writer]() {
+                for (int i = 0; i < 5; ++i) {
+                    std::this_thread::sleep_for(std::chrono::seconds(1));
+                    writer->send_sse_event("Tick " + std::to_string(i), "ping");
+                }
+                writer->end(); // Ends the chunked stream
+            }).detach();
         })
         .get("/users/:id", [](const http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> writer) {
             std::string user_id = req.params.at("id");

@@ -316,9 +316,11 @@ void Http2ResponseWriter::send_sse_event(std::string_view data, std::string_view
 }
 
 void Http2ResponseWriter::upgrade_to_raw_stream(std::function<void(std::string_view)> on_data, std::function<void()> on_close) {
-    (void)on_data;
-    (void)on_close;
-    // HTTP/2 raw stream upgrade not supported
+    // Not supported in HTTP/2
+}
+
+void Http2ResponseWriter::read_body_stream(std::function<void(std::string_view)> on_data, std::function<void()> on_end) {
+    // TODO: HTTP/2 body streaming
 }
 
 } // namespace h2

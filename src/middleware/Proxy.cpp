@@ -67,7 +67,7 @@ public:
 
             struct sockaddr_in addr{};
             addr.sin_family = AF_INET;
-            addr.sin_port = htons(self->port_);
+            addr.sin_port = htons(static_cast<uint16_t>(self->port_));
             addr.sin_addr = *(struct in_addr*)he->h_addr_list[0];
 
             // 2. Create socket
@@ -130,11 +130,11 @@ private:
         
         int pending = BIO_pending(wbio_);
         if (pending > 0) {
-            std::vector<char> buf(pending);
+            std::vector<char> buf(static_cast<size_t>(pending));
             int read_bytes = BIO_read(wbio_, buf.data(), pending);
             if (read_bytes > 0) {
                 auto self = shared_from_this();
-                proactor_.async_write(fd_, buf.data(), read_bytes, [self, cb = std::move(on_flushed)](ssize_t bytes) {
+                proactor_.async_write(fd_, buf.data(), static_cast<size_t>(read_bytes), [self, cb = std::move(on_flushed)](ssize_t bytes) {
                     if (bytes <= 0) {
                         self->fail("Failed to write TLS handshake data");
                         return;
@@ -157,6 +157,7 @@ private:
             case http::HttpMethod::DELETE: method_str = "DELETE"; break;
             case http::HttpMethod::OPTIONS: method_str = "OPTIONS"; break;
             case http::HttpMethod::HEAD: method_str = "HEAD"; break;
+            default: method_str = "GET"; break;
         }
 
         // Build forwarding request
@@ -189,7 +190,7 @@ private:
         }
 
         if (is_https_) {
-            SSL_write(ssl_, write_buf_.data(), write_buf_.size());
+            SSL_write(ssl_, write_buf_.data(), static_cast<int>(write_buf_.size()));
             write_buf_.clear();
             flush_tls_writes([this]() {
                 read_loop();
@@ -220,14 +221,14 @@ private:
         proactor_.async_read(fd_, read_buf_, sizeof(read_buf_), [self](ssize_t bytes) {
             if (bytes > 0) {
                 if (self->is_https_) {
-                    BIO_write(self->rbio_, self->read_buf_, bytes);
+                    BIO_write(self->rbio_, self->read_buf_, static_cast<int>(bytes));
                     if (!self->is_handshake_complete_) {
                         self->do_handshake();
                         return;
                     }
                     self->process_tls_read();
                 } else {
-                    self->process_cleartext(self->read_buf_, bytes);
+                    self->process_cleartext(self->read_buf_, static_cast<size_t>(bytes));
                 }
             } else {
                 if (self->is_websocket_) {
@@ -248,7 +249,7 @@ private:
         while (true) {
             int bytes = SSL_read(ssl_, buf, sizeof(buf));
             if (bytes > 0) {
-                process_cleartext(buf, bytes);
+                process_cleartext(buf, static_cast<size_t>(bytes));
             } else {
                 break;
             }
@@ -351,7 +352,7 @@ private:
             writer_->upgrade_to_raw_stream(
                 [self](std::string_view data) {
                     if (self->is_https_) {
-                        SSL_write(self->ssl_, data.data(), data.size());
+                        SSL_write(self->ssl_, data.data(), static_cast<int>(data.size()));
                         self->flush_tls_writes(nullptr);
                     } else {
                         // We must copy data to a stable buffer for async_write
@@ -411,6 +412,25 @@ routing::Middleware proxy(const std::string& target_host, int target_port) {
     bool is_https = (target_port == 443);
     return [target_host, target_port, is_https](http::HttpRequest& request, std::shared_ptr<http::ResponseWriter> writer) -> bool {
         auto proxy_req = std::make_shared<ProxyRequest>(writer->proactor(), writer, target_host, target_port, request, is_https);
+        proxy_req->start();
+        return false;
+    };
+}
+
+routing::Middleware load_balancer(const std::vector<TargetNode>& nodes) {
+    if (nodes.empty()) {
+        throw std::invalid_argument("Load balancer must have at least one target node");
+    }
+    
+    // We use a shared_ptr for the atomic counter so it can be captured by the lambda and shared across all threads
+    auto current_idx = std::make_shared<std::atomic<size_t>>(0);
+    
+    return [nodes, current_idx](http::HttpRequest& request, std::shared_ptr<http::ResponseWriter> writer) -> bool {
+        size_t idx = current_idx->fetch_add(1, std::memory_order_relaxed) % nodes.size();
+        const auto& target = nodes[idx];
+        
+        bool is_https = (target.port == 443);
+        auto proxy_req = std::make_shared<ProxyRequest>(writer->proactor(), writer, target.host, target.port, request, is_https);
         proxy_req->start();
         return false;
     };

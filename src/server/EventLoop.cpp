@@ -4,6 +4,8 @@
 #include "../network/IoUringProactor.hpp"
 #include <iostream>
 #include <arpa/inet.h>
+#include <thread>
+#include <chrono>
 
 namespace server {
 
@@ -67,7 +69,11 @@ void EventLoop::do_accept() {
             network::Socket client(client_fd);
             connection_manager_.add_connection(std::move(client), client_ip);
         } else {
-            LOG_ERROR("Accept failed");
+            LOG_ERROR("Accept failed. FD: " << client_fd);
+            if (client_fd == -EMFILE || client_fd == -ENFILE) {
+                // Wait briefly before retrying if we hit fd limits
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
         }
         
         if (is_accepting_) {

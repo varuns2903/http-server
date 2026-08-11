@@ -40,32 +40,62 @@ App& App::use(routing::Middleware m) {
 }
 
 App& App::get(const std::string& path, routing::RouteHandler handler) {
-    router_.add_route(http::HttpMethod::GET, path, std::move(handler));
+    router_.get(path, std::move(handler));
+    return *this;
+}
+
+App& App::get(const std::string& path, std::vector<routing::Middleware> mws, routing::RouteHandler handler) {
+    router_.get(path, std::move(mws), std::move(handler));
     return *this;
 }
 
 App& App::post(const std::string& path, routing::RouteHandler handler) {
-    router_.add_route(http::HttpMethod::POST, path, std::move(handler));
+    router_.post(path, std::move(handler));
+    return *this;
+}
+
+App& App::post(const std::string& path, std::vector<routing::Middleware> mws, routing::RouteHandler handler) {
+    router_.post(path, std::move(mws), std::move(handler));
     return *this;
 }
 
 App& App::put(const std::string& path, routing::RouteHandler handler) {
-    router_.add_route(http::HttpMethod::PUT, path, std::move(handler));
+    router_.put(path, std::move(handler));
+    return *this;
+}
+
+App& App::put(const std::string& path, std::vector<routing::Middleware> mws, routing::RouteHandler handler) {
+    router_.put(path, std::move(mws), std::move(handler));
     return *this;
 }
 
 App& App::patch(const std::string& path, routing::RouteHandler handler) {
-    router_.add_route(http::HttpMethod::PATCH, path, std::move(handler));
+    router_.patch(path, std::move(handler));
+    return *this;
+}
+
+App& App::patch(const std::string& path, std::vector<routing::Middleware> mws, routing::RouteHandler handler) {
+    router_.patch(path, std::move(mws), std::move(handler));
     return *this;
 }
 
 App& App::del(const std::string& path, routing::RouteHandler handler) {
-    router_.add_route(http::HttpMethod::DELETE, path, std::move(handler));
+    router_.del(path, std::move(handler));
+    return *this;
+}
+
+App& App::del(const std::string& path, std::vector<routing::Middleware> mws, routing::RouteHandler handler) {
+    router_.del(path, std::move(mws), std::move(handler));
     return *this;
 }
 
 App& App::options(const std::string& path, routing::RouteHandler handler) {
-    router_.add_route(http::HttpMethod::OPTIONS, path, std::move(handler));
+    router_.options(path, std::move(handler));
+    return *this;
+}
+
+App& App::options(const std::string& path, std::vector<routing::Middleware> mws, routing::RouteHandler handler) {
+    router_.options(path, std::move(mws), std::move(handler));
     return *this;
 }
 

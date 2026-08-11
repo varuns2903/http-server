@@ -31,11 +31,22 @@ public:
 
     // Fluent routing API
     App& get(const std::string& path, routing::RouteHandler handler);
+    App& get(const std::string& path, std::vector<routing::Middleware> mws, routing::RouteHandler handler);
+    
     App& post(const std::string& path, routing::RouteHandler handler);
+    App& post(const std::string& path, std::vector<routing::Middleware> mws, routing::RouteHandler handler);
+    
     App& put(const std::string& path, routing::RouteHandler handler);
+    App& put(const std::string& path, std::vector<routing::Middleware> mws, routing::RouteHandler handler);
+    
     App& patch(const std::string& path, routing::RouteHandler handler);
+    App& patch(const std::string& path, std::vector<routing::Middleware> mws, routing::RouteHandler handler);
+    
     App& del(const std::string& path, routing::RouteHandler handler);
+    App& del(const std::string& path, std::vector<routing::Middleware> mws, routing::RouteHandler handler);
+    
     App& options(const std::string& path, routing::RouteHandler handler);
+    App& options(const std::string& path, std::vector<routing::Middleware> mws, routing::RouteHandler handler);
     
     // WebSockets
     App& ws(const std::string& path, routing::WsHandler handler) {

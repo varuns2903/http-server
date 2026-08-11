@@ -122,6 +122,7 @@ void IoUringProactor::async_accept(int fd, std::function<void(int, sockaddr_in)>
     auto* ctx = new IoContext();
     ctx->type = OpType::ACCEPT;
     ctx->fd = fd;
+    ctx->client_len = sizeof(sockaddr_in);
     ctx->accept_cb = std::move(callback);
 
     std::lock_guard<std::mutex> lock(sq_mutex_);
