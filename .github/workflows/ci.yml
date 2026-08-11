@@ -27,7 +27,7 @@ jobs:
         sudo apt-get install -y cmake g++ libpq-dev libhiredis-dev pkg-config zlib1g-dev
         sudo apt-get install -y libnghttp2-dev liburing-dev
 
-        # Ubuntu's system OpenSSL lacks QUIC support. Build quictls/openssl (QUIC fork).
+        # Ubuntu's system OpenSSL lacks QUIC support. Build quictls/openssl.
         git clone --depth 1 --branch openssl-3.1.7+quic https://github.com/quictls/openssl.git quictls-openssl
         cd quictls-openssl
         ./config --prefix=/usr/local/quictls --libdir=lib no-tests
@@ -35,7 +35,7 @@ jobs:
         sudo make install_sw
         cd ..
 
-        # Build nghttp3 against system libraries
+        # Build nghttp3
         git clone --depth 1 --branch v1.6.0 https://github.com/ngtcp2/nghttp3.git
         cd nghttp3
         git submodule update --init
@@ -45,7 +45,7 @@ jobs:
         sudo make install
         cd ../..
 
-        # Build ngtcp2 against quictls OpenSSL (with QUIC support)
+        # Build ngtcp2 with quictls — install to /usr so pkg-config finds it
         git clone --depth 1 --branch v1.9.1 https://github.com/ngtcp2/ngtcp2.git
         cd ngtcp2
         git submodule update --init
@@ -66,7 +66,7 @@ jobs:
     - name: Install Dependencies (macOS)
       if: matrix.os == 'macos-latest'
       run: |
-        brew install cmake openssl postgresql hiredis pkg-config nghttp2 libngtcp2 libnghttp3 zlib
+        brew install cmake openssl libpq hiredis pkg-config nghttp2 libngtcp2 libnghttp3 zlib
 
     - name: Configure CMake (Ubuntu)
       if: matrix.os == 'ubuntu-latest'
@@ -80,9 +80,11 @@ jobs:
       if: matrix.os == 'macos-latest'
       run: |
         mkdir -p build && cd build
+        export PKG_CONFIG_PATH="$(brew --prefix openssl)/lib/pkgconfig:$(brew --prefix libpq)/lib/pkgconfig:$(brew --prefix libngtcp2)/lib/pkgconfig:$(brew --prefix libnghttp3)/lib/pkgconfig:$(brew --prefix nghttp2)/lib/pkgconfig:$(brew --prefix hiredis)/lib/pkgconfig:$PKG_CONFIG_PATH"
         cmake -DCMAKE_BUILD_TYPE=Release \
           -DOPENSSL_ROOT_DIR=$(brew --prefix openssl) \
-          -DPostgreSQL_ROOT=$(brew --prefix postgresql) \
+          -DPostgreSQL_ROOT=$(brew --prefix libpq) \
+          -DCMAKE_PREFIX_PATH="$(brew --prefix openssl);$(brew --prefix libpq);$(brew --prefix libngtcp2);$(brew --prefix libnghttp3);$(brew --prefix nghttp2);$(brew --prefix hiredis);$(brew --prefix zlib)" \
           ..
 
     - name: Build Framework
