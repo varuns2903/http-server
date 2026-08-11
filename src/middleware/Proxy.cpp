@@ -23,8 +23,8 @@ static std::once_flag g_proxy_tls_flag;
 class ProxyRequest : public std::enable_shared_from_this<ProxyRequest> {
 public:
     ProxyRequest(network::Proactor& proactor, std::shared_ptr<http::ResponseWriter> writer,
-                 const std::string& host, int port, const http::HttpRequest& original_req, bool is_https)
-        : proactor_(proactor), writer_(std::move(writer)), host_(host), port_(port), original_req_(original_req), is_https_(is_https) {
+                 const std::string& host, int port, const http::HttpRequest& original_req, bool is_https, const std::string& strip_prefix)
+        : proactor_(proactor), writer_(std::move(writer)), host_(host), port_(port), original_req_(original_req), is_https_(is_https), strip_prefix_(strip_prefix) {
         
         if (is_https_) {
             std::call_once(g_proxy_tls_flag, []() {
@@ -161,7 +161,13 @@ private:
         }
 
         // Build forwarding request
-        write_buf_ += method_str + " " + original_req_.uri + " HTTP/1.1\r\n";
+        std::string target_path = original_req_.uri;
+        if (!strip_prefix_.empty() && target_path.find(strip_prefix_) == 0) {
+            target_path = target_path.substr(strip_prefix_.length());
+            if (target_path.empty()) target_path = "/";
+        }
+        
+        write_buf_ += method_str + " " + target_path + " HTTP/1.1\r\n";
         write_buf_ += "Host: " + host_ + ":" + std::to_string(port_) + "\r\n";
         
         // Forward headers (except Host and Connection)
@@ -387,8 +393,9 @@ private:
     std::shared_ptr<http::ResponseWriter> writer_;
     std::string host_;
     int port_;
-    http::HttpRequest original_req_;
+    const http::HttpRequest& original_req_;
     bool is_https_;
+    std::string strip_prefix_;
     
     int fd_{-1};
     SSL* ssl_{nullptr};
@@ -408,32 +415,44 @@ private:
     size_t body_bytes_read_{0};
 };
 
+routing::Middleware proxy(ProxyOptions options) {
+    return [options](http::HttpRequest& request, std::shared_ptr<http::ResponseWriter> writer) -> bool {
+        bool is_https = (options.target_port == 443);
+        auto proxy_req = std::make_shared<ProxyRequest>(writer->proactor(), writer, options.target_host, options.target_port, request, is_https, options.strip_prefix);
+        proxy_req->start();
+        return false;
+    };
+}
+
 routing::Middleware proxy(const std::string& target_host, int target_port) {
-    bool is_https = (target_port == 443);
-    return [target_host, target_port, is_https](http::HttpRequest& request, std::shared_ptr<http::ResponseWriter> writer) -> bool {
-        auto proxy_req = std::make_shared<ProxyRequest>(writer->proactor(), writer, target_host, target_port, request, is_https);
+    ProxyOptions opts;
+    opts.target_host = target_host;
+    opts.target_port = target_port;
+    return proxy(opts);
+}
+
+routing::Middleware load_balancer(LoadBalancerOptions options) {
+    if (options.nodes.empty()) {
+        throw std::runtime_error("Load balancer requires at least one target node");
+    }
+    
+    auto current_node = std::make_shared<std::atomic<size_t>>(0);
+    
+    return [options, current_node](http::HttpRequest& request, std::shared_ptr<http::ResponseWriter> writer) -> bool {
+        size_t idx = current_node->fetch_add(1, std::memory_order_relaxed) % options.nodes.size();
+        const auto& target = options.nodes[idx];
+        
+        bool is_https = (target.port == 443);
+        auto proxy_req = std::make_shared<ProxyRequest>(writer->proactor(), writer, target.host, target.port, request, is_https, options.strip_prefix);
         proxy_req->start();
         return false;
     };
 }
 
 routing::Middleware load_balancer(const std::vector<TargetNode>& nodes) {
-    if (nodes.empty()) {
-        throw std::invalid_argument("Load balancer must have at least one target node");
-    }
-    
-    // We use a shared_ptr for the atomic counter so it can be captured by the lambda and shared across all threads
-    auto current_idx = std::make_shared<std::atomic<size_t>>(0);
-    
-    return [nodes, current_idx](http::HttpRequest& request, std::shared_ptr<http::ResponseWriter> writer) -> bool {
-        size_t idx = current_idx->fetch_add(1, std::memory_order_relaxed) % nodes.size();
-        const auto& target = nodes[idx];
-        
-        bool is_https = (target.port == 443);
-        auto proxy_req = std::make_shared<ProxyRequest>(writer->proactor(), writer, target.host, target.port, request, is_https);
-        proxy_req->start();
-        return false;
-    };
+    LoadBalancerOptions opts;
+    opts.nodes = nodes;
+    return load_balancer(opts);
 }
 
 } // namespace middleware

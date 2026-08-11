@@ -10,6 +10,7 @@ struct CorsOptions {
     std::vector<std::string> allowed_methods = {"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"};
     std::vector<std::string> allowed_headers = {"*"};
     bool allow_credentials = false;
+    int max_age = 86400; // 24 hours default
 };
 
 // Returns a middleware that handles CORS (Cross-Origin Resource Sharing)

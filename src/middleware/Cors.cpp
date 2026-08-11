@@ -49,7 +49,7 @@ routing::Middleware cors(CorsOptions options) {
             http::HttpResponse res;
             res.headers["Access-Control-Allow-Methods"] = methods_str;
             res.headers["Access-Control-Allow-Headers"] = headers_str;
-            res.headers["Access-Control-Max-Age"] = "86400"; // Cache for 24 hours
+            res.headers["Access-Control-Max-Age"] = std::to_string(options.max_age);
             
             res.status(http::HttpStatus::NoContent).send("");
             writer->send(std::move(res));
