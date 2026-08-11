@@ -1,6 +1,6 @@
 #include "WebSocketConnection.hpp"
 #include "../server/Connection.hpp"
-#include <arpa/inet.h>
+#include "../network/PlatformSocket.hpp"
 #include <cstring>
 #include <iostream>
 

@@ -1,4 +1,9 @@
 #include "HttpResponse.hpp"
+#ifdef _WIN32
+#include <io.h>
+#define open _open
+#define close _close
+#endif
 #include <sstream>
 #include <fcntl.h>
 #include <sys/stat.h>

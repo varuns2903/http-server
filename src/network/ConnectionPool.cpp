@@ -2,7 +2,7 @@
 #ifndef _WIN32
 #include <unistd.h>
 #endif
-#include <sys/socket.h>
+
 #include <openssl/ssl.h>
 
 namespace network {

@@ -1,9 +1,9 @@
 #include "Proxy.hpp"
 #include "../network/Proactor.hpp"
 #include "../utils/Logger.hpp"
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+#include "../network/PlatformSocket.hpp"
+
+
 #ifndef _WIN32
 #include <unistd.h>
 #endif
@@ -46,7 +46,7 @@ public:
         if (ssl_) SSL_free(ssl_);
         if (fd_ != -1) {
             proactor_.remove(fd_);
-            close(fd_);
+            network::close_socket(fd_);
         }
     }
 
@@ -219,7 +219,7 @@ private:
             if (bytes <= 0) {
                 if (self->is_reused_) {
                     self->proactor_.remove(self->fd_);
-                    close(self->fd_);
+                    network::close_socket(self->fd_);
                     self->fd_ = -1;
                     self->is_reused_ = false;
                     self->start();
@@ -383,7 +383,7 @@ private:
                 [self]() {
                     if (self->fd_ != -1) {
                         self->proactor_.remove(self->fd_);
-                        close(self->fd_);
+                        network::close_socket(self->fd_);
                         self->fd_ = -1;
                     }
                 }

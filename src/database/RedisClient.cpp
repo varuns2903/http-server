@@ -33,7 +33,7 @@ bool RedisClient::connect() {
 
     // Connect synchronously (this runs on worker threads, so it's okay)
     if (::connect(fd_, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-        close(fd_);
+        network::close_socket(fd_);
         fd_ = -1;
         LOG_ERROR("Failed to connect to Redis at " << host_ << ":" << port_);
         return false;
@@ -46,7 +46,7 @@ bool RedisClient::connect() {
 void RedisClient::disconnect() {
     std::lock_guard<std::mutex> lock(mutex_);
     if (fd_ != -1) {
-        close(fd_);
+        network::close_socket(fd_);
         fd_ = -1;
     }
 }
@@ -67,7 +67,7 @@ std::string RedisClient::send_command(const std::vector<std::string>& args) {
     while (total_sent < req.size()) {
         ssize_t s = send(fd_, req.data() + total_sent, req.size() - total_sent, 0);
         if (s <= 0) {
-            close(fd_);
+            network::close_socket(fd_);
             fd_ = -1;
             return ""; // Connection dropped
         }

@@ -6,7 +6,7 @@
 #include <vector>
 #include <cstring>
 #include <ngtcp2/ngtcp2.h>
-#include <netinet/in.h>
+#include "../network/PlatformSocket.hpp"
 #include "../network/UdpSocket.hpp"
 
 namespace server {
