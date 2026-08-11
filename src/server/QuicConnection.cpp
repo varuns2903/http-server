@@ -72,12 +72,18 @@ QuicConnection::QuicConnection(QuicConnectionManager& manager, const ngtcp2_cid&
         throw std::runtime_error("Failed to create ngtcp2 connection: " + std::string(ngtcp2_strerror(rv)));
     }
     
+#if defined(USE_NGTCP2_CRYPTO_OSSL)
     ngtcp2_conn_set_tls_native_handle(conn_, tls_ctx_);
+#elif defined(USE_NGTCP2_CRYPTO_QUICTLS)
+    ngtcp2_conn_set_tls_native_handle(conn_, ssl_);
+#endif
 }
 
 QuicConnection::~QuicConnection() {
     if (conn_) ngtcp2_conn_del(conn_);
-    if (tls_ctx_) NGTCP2_CRYPTO_CTX_DEL(tls_ctx_);
+#if defined(USE_NGTCP2_CRYPTO_OSSL)
+    if (tls_ctx_) ngtcp2_crypto_ossl_ctx_del(tls_ctx_);
+#endif
     if (ssl_) SSL_free(ssl_);
 }
 
@@ -85,9 +91,11 @@ bool QuicConnection::init_ssl(SSL_CTX* ssl_ctx) {
     ssl_ = SSL_new(ssl_ctx);
     if (!ssl_) return false;
     
-    if (NGTCP2_CRYPTO_CTX_NEW(&tls_ctx_, ssl_) != 0) {
+#if defined(USE_NGTCP2_CRYPTO_OSSL)
+    if (ngtcp2_crypto_ossl_ctx_new(&tls_ctx_, ssl_) != 0) {
         return false;
     }
+#endif
     
     conn_ref_.get_conn = [](ngtcp2_crypto_conn_ref* ref) {
         auto* self = static_cast<QuicConnection*>(ref->user_data);
@@ -97,9 +105,11 @@ bool QuicConnection::init_ssl(SSL_CTX* ssl_ctx) {
     
     SSL_set_app_data(ssl_, &conn_ref_);
     
-    if (NGTCP2_CRYPTO_CONFIGURE_SERVER_SESSION(ssl_) != 0) {
+#if defined(USE_NGTCP2_CRYPTO_OSSL)
+    if (ngtcp2_crypto_ossl_configure_server_session(ssl_) != 0) {
         return false;
     }
+#endif
     
     SSL_set_accept_state(ssl_);
     // SSL_set_quic_early_data_enabled(ssl_, 1); // OpenSSL 3.2+ only or disabled for now
