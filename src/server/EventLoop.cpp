@@ -2,6 +2,8 @@
 #include "../utils/Logger.hpp"
 #if defined(__APPLE__) || defined(__FreeBSD__)
 #include "../network/KqueueProactor.hpp"
+#elif defined(_WIN32)
+#include "../network/IocpProactor.hpp"
 #else
 #include "../network/EpollProactor.hpp"
 #include "../network/IoUringProactor.hpp"
@@ -14,10 +16,14 @@
 namespace server {
 
 EventLoop::EventLoop(Listener& listener, const routing::Router& router, const config::ServerConfig& config, network::TlsContext* tls_context, network::UdpSocket* quic_socket, QuicConnectionManager* quic_manager)
-    : listener_(listener), 
 #if defined(__APPLE__) || defined(__FreeBSD__)
+    : listener_(listener), 
       proactor_(std::make_unique<network::KqueueProactor>()),
+#elif defined(_WIN32)
+    : listener_(listener), 
+      proactor_(std::make_unique<network::IocpProactor>()),
 #else
+    : listener_(listener), 
       proactor_(config.engine == config::EventEngine::Epoll ? 
                static_cast<std::unique_ptr<network::Proactor>>(std::make_unique<network::EpollProactor>()) : 
                static_cast<std::unique_ptr<network::Proactor>>(std::make_unique<network::IoUringProactor>())),

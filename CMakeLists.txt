@@ -44,6 +44,8 @@ FetchContent_MakeAvailable(inja)
 # Core static library
 if(APPLE OR CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
     set(PROACTOR_SOURCES src/network/KqueueProactor.cpp)
+elseif(WIN32)
+    set(PROACTOR_SOURCES src/network/IocpProactor.cpp)
 else()
     set(PROACTOR_SOURCES src/network/EpollProactor.cpp src/network/IoUringProactor.cpp)
 endif()
@@ -111,7 +113,9 @@ target_link_directories(server_core PUBLIC
     ${NGHTTP3_LIBRARY_DIRS}
 )
 
-if(NOT APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+if(WIN32)
+    target_link_libraries(server_core PUBLIC ws2_32 mswsock)
+elseif(NOT APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
     target_link_libraries(server_core PUBLIC uring)
 endif()
 
