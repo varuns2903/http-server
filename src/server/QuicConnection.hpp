@@ -2,7 +2,22 @@
 
 #include <ngtcp2/ngtcp2.h>
 #include <ngtcp2/ngtcp2_crypto.h>
+#if defined(USE_NGTCP2_CRYPTO_OSSL)
 #include <ngtcp2/ngtcp2_crypto_ossl.h>
+#define NGTCP2_CRYPTO_CTX ngtcp2_crypto_ossl_ctx
+#define NGTCP2_CRYPTO_CTX_NEW ngtcp2_crypto_ossl_ctx_new
+#define NGTCP2_CRYPTO_CTX_DEL ngtcp2_crypto_ossl_ctx_del
+#define NGTCP2_CRYPTO_CONFIGURE_SERVER_SESSION ngtcp2_crypto_ossl_configure_server_session
+#elif defined(USE_NGTCP2_CRYPTO_QUICTLS)
+#include <ngtcp2/ngtcp2_crypto_quictls.h>
+#define NGTCP2_CRYPTO_CTX ngtcp2_crypto_quictls_ctx
+#define NGTCP2_CRYPTO_CTX_NEW ngtcp2_crypto_quictls_ctx_new
+#define NGTCP2_CRYPTO_CTX_DEL ngtcp2_crypto_quictls_ctx_del
+#define NGTCP2_CRYPTO_CONFIGURE_SERVER_SESSION ngtcp2_crypto_quictls_configure_server_session
+#else
+#error "No supported ngtcp2 crypto backend found"
+#endif
+
 #include <openssl/ssl.h>
 #include <vector>
 #include <memory>
@@ -30,7 +45,7 @@ private:
     ngtcp2_conn* conn_{nullptr};
     SSL* ssl_{nullptr};
     
-    ngtcp2_crypto_ossl_ctx* tls_ctx_{nullptr};
+    NGTCP2_CRYPTO_CTX* tls_ctx_{nullptr};
     ngtcp2_crypto_conn_ref conn_ref_;
     
     std::unique_ptr<QuicHttp3Session> h3_session_;

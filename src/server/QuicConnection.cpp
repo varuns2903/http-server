@@ -77,7 +77,7 @@ QuicConnection::QuicConnection(QuicConnectionManager& manager, const ngtcp2_cid&
 
 QuicConnection::~QuicConnection() {
     if (conn_) ngtcp2_conn_del(conn_);
-    if (tls_ctx_) ngtcp2_crypto_ossl_ctx_del(tls_ctx_);
+    if (tls_ctx_) NGTCP2_CRYPTO_CTX_DEL(tls_ctx_);
     if (ssl_) SSL_free(ssl_);
 }
 
@@ -85,7 +85,7 @@ bool QuicConnection::init_ssl(SSL_CTX* ssl_ctx) {
     ssl_ = SSL_new(ssl_ctx);
     if (!ssl_) return false;
     
-    if (ngtcp2_crypto_ossl_ctx_new(&tls_ctx_, ssl_) != 0) {
+    if (NGTCP2_CRYPTO_CTX_NEW(&tls_ctx_, ssl_) != 0) {
         return false;
     }
     
@@ -97,7 +97,7 @@ bool QuicConnection::init_ssl(SSL_CTX* ssl_ctx) {
     
     SSL_set_app_data(ssl_, &conn_ref_);
     
-    if (ngtcp2_crypto_ossl_configure_server_session(ssl_) != 0) {
+    if (NGTCP2_CRYPTO_CONFIGURE_SERVER_SESSION(ssl_) != 0) {
         return false;
     }
     

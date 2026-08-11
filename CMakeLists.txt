@@ -23,7 +23,12 @@ find_package(ZLIB REQUIRED)
 find_package(PostgreSQL REQUIRED)
 pkg_check_modules(NGHTTP2 REQUIRED libnghttp2)
 pkg_check_modules(NGTCP2 REQUIRED libngtcp2)
-pkg_check_modules(NGTCP2_CRYPTO_OSSL REQUIRED libngtcp2_crypto_ossl)
+pkg_search_module(NGTCP2_CRYPTO REQUIRED libngtcp2_crypto_ossl libngtcp2_crypto_quictls)
+if(NGTCP2_CRYPTO_MODULE_NAME STREQUAL "libngtcp2_crypto_ossl")
+    add_compile_definitions(USE_NGTCP2_CRYPTO_OSSL=1)
+elseif(NGTCP2_CRYPTO_MODULE_NAME STREQUAL "libngtcp2_crypto_quictls")
+    add_compile_definitions(USE_NGTCP2_CRYPTO_QUICTLS=1)
+endif()
 pkg_check_modules(NGHTTP3 REQUIRED libnghttp3)
 
 include(FetchContent)
@@ -93,7 +98,7 @@ target_link_libraries(server_core
         ${PostgreSQL_LIBRARIES}
         ${NGHTTP2_LIBRARIES}
         ${NGTCP2_LIBRARIES}
-        ${NGTCP2_CRYPTO_OSSL_LIBRARIES}
+        ${NGTCP2_CRYPTO_LIBRARIES}
         ${NGHTTP3_LIBRARIES}
         inja
 )
@@ -101,7 +106,7 @@ target_link_libraries(server_core
 target_link_directories(server_core PUBLIC
     ${NGHTTP2_LIBRARY_DIRS}
     ${NGTCP2_LIBRARY_DIRS}
-    ${NGTCP2_CRYPTO_OSSL_LIBRARY_DIRS}
+    ${NGTCP2_CRYPTO_LIBRARY_DIRS}
     ${NGHTTP3_LIBRARY_DIRS}
 )
 
@@ -113,7 +118,7 @@ target_include_directories(server_core PUBLIC
     ${PostgreSQL_INCLUDE_DIRS}
     ${NGHTTP2_INCLUDE_DIRS}
     ${NGTCP2_INCLUDE_DIRS}
-    ${NGTCP2_CRYPTO_OSSL_INCLUDE_DIRS}
+    ${NGTCP2_CRYPTO_INCLUDE_DIRS}
     ${NGHTTP3_INCLUDE_DIRS}
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include/http-server>
