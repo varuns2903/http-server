@@ -1,0 +1,91 @@
+#include "PrometheusRegistry.hpp"
+#include <sstream>
+
+namespace utils {
+
+void PrometheusRegistry::inc_counter(const std::string& name, const std::string& labels, double value) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    counters_[name][labels].value += value;
+    if (type_text_.find(name) == type_text_.end()) {
+        type_text_[name] = "counter";
+    }
+}
+
+void PrometheusRegistry::set_gauge(const std::string& name, const std::string& labels, double value) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    gauges_[name][labels].value = value;
+    if (type_text_.find(name) == type_text_.end()) {
+        type_text_[name] = "gauge";
+    }
+}
+
+void PrometheusRegistry::inc_gauge(const std::string& name, const std::string& labels, double value) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    gauges_[name][labels].value += value;
+    if (type_text_.find(name) == type_text_.end()) {
+        type_text_[name] = "gauge";
+    }
+}
+
+void PrometheusRegistry::dec_gauge(const std::string& name, const std::string& labels, double value) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    gauges_[name][labels].value -= value;
+}
+
+void PrometheusRegistry::observe_histogram(const std::string& name, const std::string& labels, double value) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto& m = histograms_[name][labels];
+    m.count++;
+    m.sum += value;
+    if (type_text_.find(name) == type_text_.end()) {
+        type_text_[name] = "histogram";
+    }
+}
+
+std::string PrometheusRegistry::expose() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::ostringstream oss;
+
+    auto print_metric = [&oss, this](const auto& map, const std::string& name) {
+        if (type_text_.count(name)) {
+            oss << "# TYPE " << name << " " << type_text_.at(name) << "\n";
+        }
+        for (const auto& [labels, metric] : map.at(name)) {
+            oss << name;
+            if (!labels.empty()) oss << "{" << labels << "}";
+            oss << " " << metric.value << "\n";
+        }
+    };
+    
+    auto print_histogram = [&oss, this](const auto& map, const std::string& name) {
+        if (type_text_.count(name)) {
+            oss << "# TYPE " << name << " " << type_text_.at(name) << "\n";
+        }
+        for (const auto& [labels, metric] : map.at(name)) {
+            std::string l_comma = labels.empty() ? "" : labels + ",";
+            
+            // Expose _sum and _count
+            oss << name << "_sum";
+            if (!labels.empty()) oss << "{" << labels << "}";
+            oss << " " << metric.sum << "\n";
+            
+            oss << name << "_count";
+            if (!labels.empty()) oss << "{" << labels << "}";
+            oss << " " << metric.count << "\n";
+        }
+    };
+
+    for (const auto& [name, labels_map] : counters_) {
+        print_metric(counters_, name);
+    }
+    for (const auto& [name, labels_map] : gauges_) {
+        print_metric(gauges_, name);
+    }
+    for (const auto& [name, labels_map] : histograms_) {
+        print_histogram(histograms_, name);
+    }
+
+    return oss.str();
+}
+
+} // namespace utils

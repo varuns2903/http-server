@@ -43,11 +43,17 @@ public:
         return *this;
     }
 
+    // Metrics
+    App& enable_metrics(const std::string& path = "/metrics");
+
     // Start the server (blocking)
     void listen();
     
     // Stop the server gracefully
     void stop();
+    
+    // Hot reload the server
+    void hot_reload();
 
 private:
     config::ServerConfig config_;

@@ -18,6 +18,11 @@ Listener::Listener(uint16_t port) : port_(port), socket_() {
         throw std::runtime_error(std::string("setsockopt SO_REUSEADDR failed: ") + std::strerror(errno));
     }
     
+    // Enable SO_REUSEPORT for zero-downtime hot reloading
+    if (setsockopt(socket_.fd(), SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) == -1) {
+        LOG_ERROR("setsockopt SO_REUSEPORT failed (Hot Reloading may not work): " << std::strerror(errno));
+    }
+    
     // Set listening socket to non-blocking
     socket_.set_non_blocking();
 }

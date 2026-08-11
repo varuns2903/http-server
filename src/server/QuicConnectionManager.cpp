@@ -1,4 +1,5 @@
 #include "QuicConnectionManager.hpp"
+#include "../utils/PrometheusRegistry.hpp"
 #include <iostream>
 #include <cstring>
 
@@ -65,6 +66,7 @@ void QuicConnectionManager::on_packet_received(const uint8_t* data, size_t datal
         auto conn = std::make_shared<QuicConnection>(*this, dcid_struct, parsed_scid, scid_struct, sender_addr, ssl_ctx_);
         connections_[dcid_struct] = conn;
         connections_[scid_struct] = conn; // Also map by our SCID for return packets
+        utils::PrometheusRegistry::get_instance().inc_gauge("orbit_active_connections", "type=\"quic\"");
         conn->process_packet(data, datalen, sender_addr);
     }
 }

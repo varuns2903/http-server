@@ -4,6 +4,10 @@
 #include "middleware/Proxy.hpp"
 #include "middleware/RateLimiter.hpp"
 #include "middleware/SessionManager.hpp"
+#include "middleware/JwtAuth.hpp"
+#include "middleware/Metrics.hpp"
+#include "database/RedisClient.hpp"
+#include "database/PostgresClient.hpp"
 #include "config/Config.hpp"
 #include "utils/Logger.hpp"
 #include <iostream>
@@ -39,9 +43,6 @@ int main(int argc, char* argv[]) {
             return true;
         });
 
-        // CORS Middleware
-        app.use(middleware::cors());
-
         // Proxy Middleware for /proxy -> 127.0.0.1:8080
         app.use([](http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> writer) {
             if (req.uri.find("/proxy") == 0) {
@@ -51,7 +52,22 @@ int main(int argc, char* argv[]) {
             return true;
         });
 
-        // Static File Server Middleware
+        // Proxy Middleware for /proxy -> 127.0.0.1:8080
+        app.use([](http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> writer) {
+            if (req.uri.find("/proxy") == 0) {
+                return middleware::proxy("127.0.0.1", 8080)(req, writer);
+            }
+            return true;
+        });
+
+        // Setup global middlewares
+        app.use(middleware::cors());
+        app.use(middleware::Metrics::track());
+        
+        // Enable Prometheus metrics endpoint at /metrics
+        app.enable_metrics();
+
+        // Serve static files from "public" directory
         app.use(middleware::static_files(config.static_dir));
 
         // Rate Limiting (100 requests / 10 sec)

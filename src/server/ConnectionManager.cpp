@@ -1,4 +1,5 @@
 #include "ConnectionManager.hpp"
+#include "../utils/PrometheusRegistry.hpp"
 #include <iostream>
 
 namespace server {
@@ -17,6 +18,8 @@ void ConnectionManager::add_connection(network::Socket socket, const std::string
         connections_[fd] = connection;
     }
     
+    utils::PrometheusRegistry::get_instance().inc_gauge("orbit_active_connections", "type=\"tcp\"");
+    
     // With Proactor, we kick off the first read immediately!
     connection->start();
 }
@@ -29,6 +32,7 @@ void ConnectionManager::remove_connection(int fd) {
         if (it != connections_.end()) {
             conn = it->second;
             connections_.erase(it);
+            utils::PrometheusRegistry::get_instance().dec_gauge("orbit_active_connections", "type=\"tcp\"");
         }
     }
     
@@ -37,6 +41,11 @@ void ConnectionManager::remove_connection(int fd) {
         proactor_.remove(fd);
         // The shared_ptr will be destroyed here, triggering Connection::~Connection
     }
+}
+
+size_t ConnectionManager::get_connection_count() const {
+    std::lock_guard<std::mutex> lock(map_mutex_);
+    return connections_.size();
 }
 
 } // namespace server

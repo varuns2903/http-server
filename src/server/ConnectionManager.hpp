@@ -17,6 +17,8 @@ public:
 
     void add_connection(network::Socket socket, const std::string& client_ip);
     void remove_connection(int fd);
+    
+    size_t get_connection_count() const;
 
 private:
     network::Proactor& proactor_;
@@ -25,7 +27,7 @@ private:
     TimerManager& timer_manager_;
     
     std::unordered_map<int, std::shared_ptr<Connection>> connections_;
-    std::mutex map_mutex_;
+    mutable std::mutex map_mutex_;
     size_t max_body_size_;
     network::TlsContext* tls_context_;
 };

@@ -18,6 +18,7 @@ public:
     EventLoop(Listener& listener, const routing::Router& router, const config::ServerConfig& config, network::TlsContext* tls_context = nullptr, network::UdpSocket* quic_socket = nullptr, QuicConnectionManager* quic_manager = nullptr);
     void run();
     void stop();
+    void stop_accepting();
 
 private:
     void do_accept();
@@ -31,7 +32,9 @@ private:
     network::UdpSocket* quic_socket_;
     QuicConnectionManager* quic_manager_;
     
+    
     std::atomic<bool> is_running_{true};
+    std::atomic<bool> is_accepting_{true};
 };
 
 } // namespace server

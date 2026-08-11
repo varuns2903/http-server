@@ -34,6 +34,12 @@ void EventLoop::run() {
             timer_manager_.handle_expired_timers([this](int fd) {
                 connection_manager_.remove_connection(fd);
             });
+            
+            // If we are gracefully shutting down and have no active connections, exit
+            if (!is_accepting_ && connection_manager_.get_connection_count() == 0) {
+                is_running_ = false;
+                LOG_INFO("All active connections drained. Shutting down completely.");
+            }
         } catch (const std::exception& e) {
             LOG_ERROR("Error in event loop: " + std::string(e.what()));
         }
@@ -44,6 +50,13 @@ void EventLoop::run() {
 
 void EventLoop::stop() {
     is_running_ = false;
+}
+
+void EventLoop::stop_accepting() {
+    is_accepting_ = false;
+    // Remove listener from proactor
+    proactor_->remove(listener_.fd());
+    LOG_INFO("Event loop stopped accepting new connections. Waiting for active connections to drain...");
 }
 
 void EventLoop::do_accept() {
@@ -57,7 +70,7 @@ void EventLoop::do_accept() {
             LOG_ERROR("Accept failed");
         }
         
-        if (is_running_) {
+        if (is_accepting_) {
             do_accept();
         }
     });

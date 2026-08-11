@@ -1,7 +1,11 @@
 #include "App.hpp"
 #include "../utils/Logger.hpp"
+#include "../utils/PrometheusRegistry.hpp"
 #include <csignal>
 #include <cstring>
+#include <unistd.h>
+#include <fcntl.h>
+#include <vector>
 
 namespace server {
 
@@ -9,8 +13,13 @@ static App* g_app = nullptr;
 
 void signal_handler(int signum) {
     if (g_app) {
-        LOG_INFO("Interrupt signal (" << signum << ") received. Stopping server gracefully...");
-        g_app->stop();
+        if (signum == SIGUSR2) {
+            LOG_INFO("SIGUSR2 received. Initiating zero-downtime hot reload...");
+            g_app->hot_reload();
+        } else {
+            LOG_INFO("Interrupt signal (" << signum << ") received. Stopping server gracefully...");
+            g_app->stop();
+        }
     }
 }
 
@@ -60,6 +69,16 @@ App& App::options(const std::string& path, routing::RouteHandler handler) {
     return *this;
 }
 
+App& App::enable_metrics(const std::string& path) {
+    this->get(path, [](const http::HttpRequest&, std::shared_ptr<http::ResponseWriter> res) {
+        http::HttpResponse response;
+        response.status(http::HttpStatus::OK);
+        response.set_body(utils::PrometheusRegistry::get_instance().expose(), "text/plain; version=0.0.4");
+        res->send(std::move(response));
+    });
+    return *this;
+}
+
 void App::listen() {
     g_app = this;
     
@@ -68,6 +87,7 @@ void App::listen() {
     action.sa_handler = signal_handler;
     sigaction(SIGINT, &action, nullptr);
     sigaction(SIGTERM, &action, nullptr);
+    sigaction(SIGUSR2, &action, nullptr);
 
     listener_ = std::make_unique<Listener>(config_.port);
     listener_->start();
@@ -89,6 +109,50 @@ void App::listen() {
 void App::stop() {
     if (event_loop_) {
         event_loop_->stop();
+    }
+}
+
+void App::hot_reload() {
+    pid_t pid = fork();
+    if (pid == 0) {
+        // Child: exec current binary
+        std::vector<std::string> args_str;
+        std::vector<char*> args;
+        
+        int fd = open("/proc/self/cmdline", O_RDONLY);
+        if (fd >= 0) {
+            char buf[4096];
+            ssize_t n = read(fd, buf, sizeof(buf));
+            if (n > 0) {
+                for (ssize_t i = 0; i < n; ) {
+                    args_str.push_back(std::string(&buf[i]));
+                    i += args_str.back().length() + 1;
+                }
+            }
+            close(fd);
+        }
+        
+        if (!args_str.empty()) {
+            for (auto& s : args_str) args.push_back(s.data());
+            args.push_back(nullptr);
+            
+            // Close all FDs except 0, 1, 2 (stdin, stdout, stderr)
+            for (int i = 3; i < 1024; ++i) {
+                close(i);
+            }
+            
+            execv(args[0], args.data());
+            
+            LOG_ERROR("Failed to exec during hot reload: " << strerror(errno));
+            exit(1);
+        }
+    } else if (pid > 0) {
+        // Parent: Stop accepting new connections and drain
+        if (event_loop_) {
+            event_loop_->stop_accepting();
+        }
+    } else {
+        LOG_ERROR("Failed to fork for hot reload: " << strerror(errno));
     }
 }
 
