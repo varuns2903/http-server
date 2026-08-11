@@ -80,13 +80,6 @@ jobs:
         # Debug: verify .pc files installed
         echo "--- Installed ngtcp2 .pc files ---"
         find /usr -name "libngtcp2*.pc" 2>/dev/null
-        # Ensure our CMake check for libngtcp2_crypto_ossl finds it even if it's named quictls
-        if [ ! -f /usr/lib/pkgconfig/libngtcp2_crypto_ossl.pc ] && [ -f /usr/lib/pkgconfig/libngtcp2_crypto_quictls.pc ]; then
-            sudo ln -s /usr/lib/pkgconfig/libngtcp2_crypto_quictls.pc /usr/lib/pkgconfig/libngtcp2_crypto_ossl.pc
-        elif [ ! -f /usr/lib/x86_64-linux-gnu/pkgconfig/libngtcp2_crypto_ossl.pc ] && [ -f /usr/lib/x86_64-linux-gnu/pkgconfig/libngtcp2_crypto_quictls.pc ]; then
-            sudo ln -s /usr/lib/x86_64-linux-gnu/pkgconfig/libngtcp2_crypto_quictls.pc /usr/lib/x86_64-linux-gnu/pkgconfig/libngtcp2_crypto_ossl.pc
-        fi
-        pkg-config --modversion libngtcp2_crypto_ossl || echo "WARN: libngtcp2_crypto_ossl .pc not found"
 
     - name: Install Dependencies (macOS)
       if: matrix.os == 'macos-latest'
