@@ -2,6 +2,9 @@
 #ifndef _WIN32
 #include <unistd.h>
 #endif
+#include <stdexcept>
+#include <iostream>
+#include "PlatformSocket.hpp"
 
 #include <openssl/ssl.h>
 
