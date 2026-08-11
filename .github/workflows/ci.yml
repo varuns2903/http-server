@@ -34,6 +34,8 @@ jobs:
         make -j$(nproc)
         sudo make install_sw
         cd ..
+        echo "/usr/local/quictls/lib" | sudo tee /etc/ld.so.conf.d/quictls.conf
+        sudo ldconfig
 
         # Build nghttp3
         git clone --depth 1 --branch v1.6.0 https://github.com/ngtcp2/nghttp3.git
@@ -45,7 +47,8 @@ jobs:
         sudo make install
         cd ../..
 
-        # Build ngtcp2 with quictls — install to /usr so pkg-config finds it
+        # Build ngtcp2 with quictls — set PKG_CONFIG_PATH so it finds quictls
+        export PKG_CONFIG_PATH="/usr/local/quictls/lib/pkgconfig:$PKG_CONFIG_PATH"
         git clone --depth 1 --branch v1.9.1 https://github.com/ngtcp2/ngtcp2.git
         cd ngtcp2
         git submodule update --init
@@ -53,15 +56,16 @@ jobs:
         cmake -DCMAKE_INSTALL_PREFIX=/usr \
               -DENABLE_LIB_ONLY=ON \
               -DCMAKE_BUILD_TYPE=Release \
+              -DENABLE_OPENSSL=ON \
               -DOPENSSL_ROOT_DIR=/usr/local/quictls \
+              -DCMAKE_FIND_ROOT_PATH=/usr/local/quictls \
               ..
         make -j$(nproc)
         sudo make install
         cd ../..
 
-        # Ensure linker can find quictls libraries at runtime
-        echo "/usr/local/quictls/lib" | sudo tee /etc/ld.so.conf.d/quictls.conf
-        sudo ldconfig
+        # Verify the .pc file was installed
+        pkg-config --modversion libngtcp2_crypto_ossl || echo "WARNING: libngtcp2_crypto_ossl not found"
 
     - name: Install Dependencies (macOS)
       if: matrix.os == 'macos-latest'

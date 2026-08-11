@@ -1,9 +1,11 @@
 #include "Socket.hpp"
 #include <sys/socket.h>
 #include <stdexcept>
+#include <string>
 #include <cerrno>
 #include <cstring>
 #include <fcntl.h>
+#include <unistd.h>
 
 namespace network {
 
