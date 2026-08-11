@@ -73,6 +73,7 @@ jobs:
               -DOPENSSL_INCLUDE_DIR=/usr/local/ssl/include \
               -DOPENSSL_CRYPTO_LIBRARY=/usr/local/ssl/lib/libcrypto.so \
               -DOPENSSL_SSL_LIBRARY=/usr/local/ssl/lib/libssl.so \
+              -DHAVE_SSL_PROVIDE_QUIC_DATA=1 \
               ..
         make -j$(nproc)
         sudo make install
