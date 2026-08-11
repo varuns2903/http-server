@@ -24,23 +24,49 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       run: |
         sudo apt-get update
-        sudo apt-get install -y cmake g++ libssl-dev libpq-dev libhiredis-dev pkg-config
+        sudo apt-get install -y cmake g++ libssl-dev libpq-dev libhiredis-dev pkg-config zlib1g-dev
         sudo apt-get install -y libnghttp2-dev liburing-dev
-        # Depending on ubuntu version, ngtcp2 and nghttp3 might need to be built from source or fetched via vcpkg
-        # We will attempt apt-get first. If it fails, we will dynamically install it.
-        sudo apt-get install -y libngtcp2-dev libngtcp2-crypto-openssl-dev libnghttp3-dev || echo "Skipping ngtcp2 apt install, might fail in CMake"
+
+        # ngtcp2 and nghttp3 are not in standard Ubuntu repos — build from source
+        # Install nghttp3
+        git clone --depth 1 --branch v1.6.0 https://github.com/ngtcp2/nghttp3.git
+        cd nghttp3
+        git submodule update --init
+        mkdir build && cd build
+        cmake -DCMAKE_INSTALL_PREFIX=/usr -DENABLE_LIB_ONLY=ON -DCMAKE_BUILD_TYPE=Release ..
+        make -j$(nproc)
+        sudo make install
+        cd ../..
+
+        # Install ngtcp2
+        git clone --depth 1 --branch v1.9.1 https://github.com/ngtcp2/ngtcp2.git
+        cd ngtcp2
+        git submodule update --init
+        mkdir build && cd build
+        cmake -DCMAKE_INSTALL_PREFIX=/usr -DENABLE_LIB_ONLY=ON -DCMAKE_BUILD_TYPE=Release ..
+        make -j$(nproc)
+        sudo make install
+        cd ../..
 
     - name: Install Dependencies (macOS)
       if: matrix.os == 'macos-latest'
       run: |
-        brew update
-        brew install cmake openssl postgresql hiredis pkg-config nghttp2 ngtcp2 nghttp3
+        brew install cmake openssl postgresql hiredis pkg-config nghttp2 libngtcp2 libnghttp3 zlib
 
-    - name: Configure CMake
+    - name: Configure CMake (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
       run: |
-        mkdir build
-        cd build
+        mkdir -p build && cd build
         cmake -DCMAKE_BUILD_TYPE=Release ..
+
+    - name: Configure CMake (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        mkdir -p build && cd build
+        cmake -DCMAKE_BUILD_TYPE=Release \
+          -DOPENSSL_ROOT_DIR=$(brew --prefix openssl) \
+          -DPostgreSQL_ROOT=$(brew --prefix postgresql) \
+          ..
 
     - name: Build Framework
       run: |
