@@ -89,7 +89,7 @@ jobs:
     - name: Install Dependencies (Windows)
       if: matrix.os == 'windows-latest'
       run: |
-        vcpkg install pkgconf nghttp2 ngtcp2 nghttp3 openssl libpq zlib --triplet x64-windows
+        vcpkg install pkgconf nghttp2 ngtcp2[openssl] nghttp3 openssl libpq zlib --triplet x64-windows
 
     - name: Configure CMake (Ubuntu)
       if: matrix.os == 'ubuntu-latest'
