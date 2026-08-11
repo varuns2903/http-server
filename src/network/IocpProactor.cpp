@@ -1,6 +1,7 @@
 #include "IocpProactor.hpp"
 #ifdef _WIN32
 #include <mswsock.h>
+#include <io.h>
 #include <stdexcept>
 #include <iostream>
 
@@ -95,9 +96,6 @@ void IocpProactor::run_once(int timeout_ms) {
         }
     } else {
         if (ctx->type == IocpOperationType::ACCEPT) {
-            sockaddr_in* local_addr = nullptr;
-            sockaddr_in* remote_addr = nullptr;
-            int local_len = 0, remote_len = 0;
             
             // GetAcceptExSockaddrs is statically linked from mswsock
             // but we might need GetAcceptExSockaddrs function pointer too.
@@ -192,8 +190,8 @@ void IocpProactor::async_sendfile(socket_t out_fd, int in_fd, off_t offset, size
     ctx->io_callback = std::move(callback);
     
     // Set overlapped offset
-    ctx->overlapped.Offset = static_cast<DWORD>(offset & 0xFFFFFFFF);
-    ctx->overlapped.OffsetHigh = static_cast<DWORD>((offset >> 32) & 0xFFFFFFFF);
+    ctx->overlapped.Offset = static_cast<DWORD>(static_cast<uint64_t>(offset) & 0xFFFFFFFF);
+    ctx->overlapped.OffsetHigh = static_cast<DWORD>((static_cast<uint64_t>(offset) >> 32) & 0xFFFFFFFF);
 
     {
         std::lock_guard<std::mutex> lock(mutex_);

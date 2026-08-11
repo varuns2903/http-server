@@ -1,79 +1,55 @@
 #include "Config.hpp"
 #include <iostream>
 #include <cstdlib>
-#include <getopt.h>
+#include <cstdlib>
+#include <string>
 
 namespace config {
 
 ServerConfig ServerConfig::parse(int argc, char* argv[]) {
     ServerConfig cfg;
     
-    const char* const short_opts = "p:t:l:s:h";
-    const option long_opts[] = {
-        {"port", required_argument, nullptr, 'p'},
-        {"threads", required_argument, nullptr, 't'},
-        {"log-level", required_argument, nullptr, 'l'},
-        {"static-dir", required_argument, nullptr, 's'},
-        {"max-body-size", required_argument, nullptr, 'm'},
-        {"ssl-cert", required_argument, nullptr, 'c'},
-        {"ssl-key", required_argument, nullptr, 'k'},
-        {"engine", required_argument, nullptr, 'e'},
-        {"help", no_argument, nullptr, 'h'},
-        {nullptr, no_argument, nullptr, 0}
-    };
-
-    while (true) {
-        const auto opt = getopt_long(argc, argv, short_opts, long_opts, nullptr);
-        if (-1 == opt) break;
-
-        switch (opt) {
-            case 'p':
-                cfg.port = static_cast<uint16_t>(std::stoi(optarg));
-                break;
-            case 't':
-                cfg.worker_threads = static_cast<size_t>(std::stoull(optarg));
-                break;
-            case 'l':
-                cfg.log_level = optarg;
-                break;
-            case 's':
-                cfg.static_dir = optarg;
-                break;
-            case 'm':
-                cfg.max_body_size = static_cast<size_t>(std::stoull(optarg));
-                break;
-            case 'c':
-                cfg.ssl_cert = optarg;
-                break;
-            case 'k':
-                cfg.ssl_key = optarg;
-                break;
-            case 'e': {
-                std::string engine_str = optarg;
-                if (engine_str == "epoll") {
-                    cfg.engine = EventEngine::Epoll;
-                } else if (engine_str == "iouring") {
-                    cfg.engine = EventEngine::IoUring;
-                } else {
-                    std::cerr << "Invalid engine: " << engine_str << ". Must be 'epoll' or 'iouring'\n";
-                    std::exit(1);
-                }
-                break;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "-h" || arg == "--help") {
+            std::cout << "Usage: " << argv[0] << " [options]\n"
+                      << "Options:\n"
+                      << "  -p, --port <port>             Port to listen on (default: 8080)\n"
+                      << "  -t, --threads <num>           Number of worker threads (default: hardware concurrency)\n"
+                      << "  -l, --log-level <level>       Log level (DEBUG, INFO, WARN, ERROR) (default: INFO)\n"
+                      << "  -s, --static-dir <dir>        Directory for static files\n"
+                      << "  -m, --max-body-size <bytes>   Max request body size\n"
+                      << "  -c, --ssl-cert <file>         SSL certificate file (enables HTTPS)\n"
+                      << "  -k, --ssl-key <file>          SSL private key file\n"
+                      << "  -e, --engine <engine>         Event loop engine (epoll, iouring) (default: epoll)\n"
+                      << "  -h, --help                    Show this help message\n";
+            std::exit(0);
+        } else if ((arg == "-p" || arg == "--port") && i + 1 < argc) {
+            cfg.port = static_cast<uint16_t>(std::stoi(argv[++i]));
+        } else if ((arg == "-t" || arg == "--threads") && i + 1 < argc) {
+            cfg.worker_threads = static_cast<size_t>(std::stoull(argv[++i]));
+        } else if ((arg == "-l" || arg == "--log-level") && i + 1 < argc) {
+            cfg.log_level = argv[++i];
+        } else if ((arg == "-s" || arg == "--static-dir") && i + 1 < argc) {
+            cfg.static_dir = argv[++i];
+        } else if ((arg == "-m" || arg == "--max-body-size") && i + 1 < argc) {
+            cfg.max_body_size = static_cast<size_t>(std::stoull(argv[++i]));
+        } else if ((arg == "-c" || arg == "--ssl-cert") && i + 1 < argc) {
+            cfg.ssl_cert = argv[++i];
+        } else if ((arg == "-k" || arg == "--ssl-key") && i + 1 < argc) {
+            cfg.ssl_key = argv[++i];
+        } else if ((arg == "-e" || arg == "--engine") && i + 1 < argc) {
+            std::string engine_str = argv[++i];
+            if (engine_str == "epoll") {
+                cfg.engine = EventEngine::Epoll;
+            } else if (engine_str == "iouring") {
+                cfg.engine = EventEngine::IoUring;
+            } else {
+                std::cerr << "Invalid engine: " << engine_str << ". Must be 'epoll' or 'iouring'\n";
+                std::exit(1);
             }
-            case 'h':
-            case '?':
-            default:
-                std::cout << "Usage: " << argv[0] << " [options]\n"
-                          << "  -p, --port <port>           Port to listen on (default: 8080)\n"
-                          << "  -t, --threads <count>       Number of worker threads (default: 4)\n"
-                          << "  -l, --log-level <level>     Log level (DEBUG, INFO, WARN, ERROR) (default: INFO)\n"
-                          << "  -s, --static-dir <dir>      Directory for static files (default: ./public)\n"
-                          << "  -m, --max-body-size <bytes> Maximum HTTP request body size (default: 10485760 (10MB))\n"
-                          << "  -c, --ssl-cert <file>       Path to SSL/TLS certificate file\n"
-                          << "  -k, --ssl-key <file>        Path to SSL/TLS private key file\n"
-                          << "  -e, --engine <engine>       Event backend: 'epoll' or 'iouring' (default: iouring)\n"
-                          << "  -h, --help                  Show this help message\n";
-                std::exit(0);
+        } else {
+            std::cerr << "Unknown argument: " << arg << "\n";
         }
     }
     return cfg;

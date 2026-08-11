@@ -1,7 +1,9 @@
 #include "Http2Session.hpp"
 #include "../server/Connection.hpp"
 #include <iostream>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 #include <sys/types.h>
 
 namespace http {

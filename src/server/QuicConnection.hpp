@@ -16,7 +16,7 @@
 #include <vector>
 #include <memory>
 #include <chrono>
-#include <netinet/in.h>
+#include "../network/PlatformSocket.hpp"
 
 namespace server {
 

@@ -37,7 +37,14 @@ void Logger::log(LogLevel level, const char* file, int line, const std::string& 
     }
     
     std::lock_guard<std::mutex> lock(log_mutex);
-    std::cout << "[" << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S") 
+#ifdef _WIN32
+    struct tm ti;
+    localtime_s(&ti, &time);
+    struct tm* ti_ptr = &ti;
+#else
+    struct tm* ti_ptr = std::localtime(&time);
+#endif
+    std::cout << "[" << std::put_time(ti_ptr, "%Y-%m-%d %H:%M:%S") 
               << "." << std::setfill('0') << std::setw(3) << ms.count() << "] "
               << "[" << level_to_string(level) << "] "
               << "[" << file_str << ":" << line << "] "

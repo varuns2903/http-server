@@ -1,4 +1,7 @@
 #pragma once
+#ifdef _WIN32
+#undef ERROR
+#endif
 #include <string>
 #include <iostream>
 #include <sstream>

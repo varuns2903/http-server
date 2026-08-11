@@ -2,7 +2,9 @@
 #include <sstream>
 #include <fcntl.h>
 #include <sys/stat.h>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 #include <inja/inja.hpp>
 
 namespace http {

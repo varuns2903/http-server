@@ -1,8 +1,8 @@
 #pragma once
 #include <string>
 #include <unordered_map>
-#include <unistd.h>
-#include <sys/types.h>
+#include <cstddef>
+#include <cstdint>
 #include "json.hpp"
 #include "../utils/CaseInsensitive.hpp"
 

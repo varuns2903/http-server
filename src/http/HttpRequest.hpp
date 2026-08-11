@@ -1,4 +1,7 @@
 #pragma once
+#ifdef _WIN32
+#undef DELETE
+#endif
 #include <string>
 #include <string_view>
 #include <unordered_map>

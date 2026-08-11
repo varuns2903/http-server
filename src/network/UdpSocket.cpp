@@ -2,7 +2,7 @@
 #include <stdexcept>
 #include <cerrno>
 #include <cstring>
-#include <arpa/inet.h>
+#include "PlatformSocket.hpp"
 
 namespace network {
 

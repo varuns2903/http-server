@@ -5,7 +5,9 @@
 #include "../http/WebSocketConnection.hpp"
 #include "../http/Http2Session.hpp"
 #include "../config/Config.hpp"
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 #include <iostream>
 #include <sys/socket.h>
 

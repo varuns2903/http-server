@@ -5,7 +5,9 @@
 #include "../network/PlatformSocket.hpp"
 #include <csignal>
 #include <cstring>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 #include <fcntl.h>
 #include <vector>
 
