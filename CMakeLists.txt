@@ -98,6 +98,13 @@ target_link_libraries(server_core
         inja
 )
 
+target_link_directories(server_core PUBLIC
+    ${NGHTTP2_LIBRARY_DIRS}
+    ${NGTCP2_LIBRARY_DIRS}
+    ${NGTCP2_CRYPTO_OSSL_LIBRARY_DIRS}
+    ${NGHTTP3_LIBRARY_DIRS}
+)
+
 if(NOT APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
     target_link_libraries(server_core PUBLIC uring)
 endif()

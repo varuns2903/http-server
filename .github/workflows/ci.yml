@@ -62,6 +62,9 @@ jobs:
         git submodule update --init
         mkdir build && cd build
         PKG_CONFIG_PATH="/usr/local/ssl/lib/pkgconfig:$PKG_CONFIG_PATH" \
+        CFLAGS="-I/usr/local/ssl/include" \
+        CXXFLAGS="-I/usr/local/ssl/include" \
+        LDFLAGS="-L/usr/local/ssl/lib -Wl,-rpath,/usr/local/ssl/lib" \
         cmake -DCMAKE_INSTALL_PREFIX=/usr \
               -DENABLE_LIB_ONLY=ON \
               -DCMAKE_BUILD_TYPE=Release \
