@@ -28,7 +28,7 @@ routing::Middleware static_files(const std::string& directory) {
                 if (fs::is_regular_file(requested_path)) {
                     auto ftime = fs::last_write_time(requested_path);
                     auto fsize = fs::file_size(requested_path);
-                    std::string etag = "W/\"" + std::to_string(fsize) + "-" + std::to_string(ftime.time_since_epoch().count()) + "\"";
+                    std::string etag = "W/\"" + std::to_string(static_cast<unsigned long long>(fsize)) + "-" + std::to_string(static_cast<unsigned long long>(ftime.time_since_epoch().count())) + "\"";
                     
                     auto inm_it = request.headers.find("If-None-Match");
                     if (inm_it != request.headers.end() && inm_it->second == etag) {

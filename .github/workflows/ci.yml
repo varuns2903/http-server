@@ -30,14 +30,15 @@ jobs:
         sudo apt-get install -y cmake g++ libpq-dev libhiredis-dev pkg-config zlib1g-dev
         sudo apt-get install -y libnghttp2-dev liburing-dev
 
-        # Ubuntu's system OpenSSL lacks QUIC support. Build quictls/openssl.
-        git clone --depth 1 --branch openssl-3.1.7+quic https://github.com/quictls/openssl.git quictls-openssl
-        cd quictls-openssl
-        ./config --prefix=/usr/local/quictls --libdir=lib no-tests
+        # Ubuntu's system OpenSSL lacks QUIC support. Build OpenSSL 3.3.1.
+        wget https://github.com/openssl/openssl/releases/download/openssl-3.3.1/openssl-3.3.1.tar.gz
+        tar -xzf openssl-3.3.1.tar.gz
+        cd openssl-3.3.1
+        ./config --prefix=/usr/local/ssl --libdir=lib no-tests
         make -j$(nproc)
         sudo make install_sw
         cd ..
-        echo "/usr/local/quictls/lib" | sudo tee /etc/ld.so.conf.d/quictls.conf
+        echo "/usr/local/ssl/lib" | sudo tee /etc/ld.so.conf.d/openssl.conf
         sudo ldconfig
 
         # Build nghttp3
@@ -50,20 +51,20 @@ jobs:
         sudo make install
         cd ../..
 
-        # Build ngtcp2 with quictls
+        # Build ngtcp2 with OpenSSL 3.3
         git clone --depth 1 --branch v1.9.1 https://github.com/ngtcp2/ngtcp2.git
         cd ngtcp2
         git submodule update --init
         mkdir build && cd build
-        PKG_CONFIG_PATH="/usr/local/quictls/lib/pkgconfig:$PKG_CONFIG_PATH" \
+        PKG_CONFIG_PATH="/usr/local/ssl/lib/pkgconfig:$PKG_CONFIG_PATH" \
         cmake -DCMAKE_INSTALL_PREFIX=/usr \
               -DENABLE_LIB_ONLY=ON \
               -DCMAKE_BUILD_TYPE=Release \
               -DENABLE_OPENSSL=ON \
-              -DOPENSSL_ROOT_DIR=/usr/local/quictls \
-              -DOPENSSL_INCLUDE_DIR=/usr/local/quictls/include \
-              -DOPENSSL_CRYPTO_LIBRARY=/usr/local/quictls/lib/libcrypto.so \
-              -DOPENSSL_SSL_LIBRARY=/usr/local/quictls/lib/libssl.so \
+              -DOPENSSL_ROOT_DIR=/usr/local/ssl \
+              -DOPENSSL_INCLUDE_DIR=/usr/local/ssl/include \
+              -DOPENSSL_CRYPTO_LIBRARY=/usr/local/ssl/lib/libcrypto.so \
+              -DOPENSSL_SSL_LIBRARY=/usr/local/ssl/lib/libssl.so \
               ..
         make -j$(nproc)
         sudo make install
@@ -83,8 +84,9 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       run: |
         mkdir -p build && cd build
+        export PKG_CONFIG_PATH="/usr/local/ssl/lib/pkgconfig:$PKG_CONFIG_PATH"
         cmake -DCMAKE_BUILD_TYPE=Release \
-              -DOPENSSL_ROOT_DIR=/usr/local/quictls \
+              -DOPENSSL_ROOT_DIR=/usr/local/ssl \
               ..
 
     - name: Configure CMake (macOS)
