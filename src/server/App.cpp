@@ -17,10 +17,13 @@ static App* g_app = nullptr;
 
 void signal_handler(int signum) {
     if (g_app) {
+#ifndef _WIN32
         if (signum == SIGUSR2) {
             LOG_INFO("SIGUSR2 received. Initiating zero-downtime hot reload...");
             g_app->hot_reload();
-        } else {
+        } else
+#endif
+        {
             LOG_INFO("Interrupt signal (" << signum << ") received. Stopping server gracefully...");
             g_app->stop();
         }
@@ -122,12 +125,17 @@ App& App::enable_metrics(const std::string& path) {
 void App::listen() {
     g_app = this;
     
+#ifndef _WIN32
     struct sigaction action;
     std::memset(&action, 0, sizeof(action));
     action.sa_handler = signal_handler;
     sigaction(SIGINT, &action, nullptr);
     sigaction(SIGTERM, &action, nullptr);
     sigaction(SIGUSR2, &action, nullptr);
+#else
+    signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
+#endif
 
     listener_ = std::make_unique<Listener>(config_.port);
     listener_->start();
@@ -153,6 +161,7 @@ void App::stop() {
 }
 
 void App::hot_reload() {
+#ifndef _WIN32
     pid_t pid = fork();
     if (pid == 0) {
         // Child: exec current binary
@@ -194,6 +203,9 @@ void App::hot_reload() {
     } else {
         LOG_ERROR("Failed to fork for hot reload: " << strerror(errno));
     }
+#else
+    LOG_ERROR("Hot reload not supported on Windows");
+#endif
 }
 
 } // namespace server

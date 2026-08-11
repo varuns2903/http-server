@@ -9,7 +9,7 @@
 #include <unistd.h>
 #endif
 #include <iostream>
-#include <sys/socket.h>
+#include "../network/PlatformSocket.hpp"
 
 namespace server {
 

@@ -9,7 +9,7 @@
 #include "../network/IoUringProactor.hpp"
 #endif
 #include <iostream>
-#include <arpa/inet.h>
+#include "../network/PlatformSocket.hpp"
 #include <thread>
 #include <chrono>
 

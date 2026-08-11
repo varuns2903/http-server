@@ -8,8 +8,8 @@
 #include <unistd.h>
 #endif
 #include <fcntl.h>
-#include <netdb.h>
-#include <netdb.h>
+
+
 #include <memory>
 #include <mutex>
 #include "../network/ConnectionPool.hpp"

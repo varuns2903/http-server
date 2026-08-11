@@ -5,6 +5,9 @@
 #include <stdexcept>
 #include <iostream>
 #include "PlatformSocket.hpp"
+#ifndef MSG_DONTWAIT
+#define MSG_DONTWAIT 0
+#endif
 
 #include <openssl/ssl.h>
 
@@ -26,14 +29,14 @@ std::pair<int, void*> ConnectionPool::acquire(const std::string& host, int port)
         if (ret == 0) {
             // Socket was closed by peer cleanly
             if (ssl) SSL_free(static_cast<SSL*>(ssl));
-            close(fd);
+            network::close_socket(fd);
             // Recursive fallback to get the next one
             lock.unlock();
             return acquire(host, port);
         } else if (ret < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
             // Socket has an error
             if (ssl) SSL_free(static_cast<SSL*>(ssl));
-            close(fd);
+            network::close_socket(fd);
             lock.unlock();
             return acquire(host, port);
         }
@@ -67,7 +70,7 @@ void ConnectionPool::cleanup_stale_connections() {
         while (it != conns.end()) {
             if (std::chrono::duration_cast<std::chrono::seconds>(now - it->last_used).count() > 60) {
                 if (it->ssl) SSL_free(static_cast<SSL*>(it->ssl));
-                close(it->fd);
+                network::close_socket(it->fd);
                 it = conns.erase(it);
             } else {
                 ++it;

@@ -62,7 +62,7 @@ routing::Middleware static_files(const std::string& directory) {
                 writer->send(std::move(res));
                 return false; // Handled as error, stop pipeline!
             }
-        } catch (const std::exception& e) {
+        } catch (const std::exception&) {
             // File not found or directory does not exist, fall through to next middleware/route
         }
         

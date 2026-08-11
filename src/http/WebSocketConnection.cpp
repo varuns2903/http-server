@@ -172,6 +172,7 @@ bool WebSocketConnection::parse_frame_header(const std::vector<char>& buffer, Fr
     header.fin = (byte0 & 0x80) != 0;
     header.opcode = byte0 & 0x0F;
     bool rsv1 = (byte0 & 0x40) != 0; // Compress flag
+    (void)rsv1;
     header.masked = (byte1 & 0x80) != 0;
     
     uint8_t initial_len = byte1 & 0x7F;

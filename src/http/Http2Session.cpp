@@ -1,8 +1,20 @@
 #include "Http2Session.hpp"
+#ifdef _WIN32
+#include <io.h>
+#define close _close
+#define open _open
+inline ssize_t pread(int fd, void* buf, size_t count, long offset) {
+    _lseek(fd, offset, SEEK_SET);
+    return _read(fd, buf, static_cast<unsigned int>(count));
+}
+#endif
 #include "../server/Connection.hpp"
 #include <iostream>
 #ifndef _WIN32
 #include <unistd.h>
+#else
+#undef DELETE
+#undef ERROR
 #endif
 #include <sys/types.h>
 
@@ -173,7 +185,7 @@ ssize_t Http2Session::data_provider_read(nghttp2_session *session, int32_t strea
     if (!stream_ctx) return NGHTTP2_ERR_DEFERRED;
 
     if (stream_ctx->file_fd != -1) {
-        size_t to_read = std::min(length, static_cast<size_t>(stream_ctx->file_size - stream_ctx->file_offset));
+        size_t to_read = (std::min)(length, static_cast<size_t>(stream_ctx->file_size - stream_ctx->file_offset));
         if (to_read == 0) {
             *data_flags |= NGHTTP2_DATA_FLAG_EOF;
             return 0;
@@ -188,7 +200,7 @@ ssize_t Http2Session::data_provider_read(nghttp2_session *session, int32_t strea
         }
         return bytes;
     } else {
-        size_t to_read = std::min(length, stream_ctx->response_body.size() - stream_ctx->response_offset);
+        size_t to_read = (std::min)(length, stream_ctx->response_body.size() - stream_ctx->response_offset);
         if (to_read == 0) {
             *data_flags |= NGHTTP2_DATA_FLAG_EOF;
             return 0;
