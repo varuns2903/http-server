@@ -29,7 +29,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y cmake g++ libpq-dev libhiredis-dev pkg-config zlib1g-dev valgrind wrk
-        sudo apt-get install -y libnghttp2-dev liburing-dev
+        sudo apt-get install -y libnghttp2-dev liburing-dev libmariadb-dev libmongoc-dev libbson-dev
 
         # Ubuntu's system OpenSSL lacks QUIC support, and ngtcp2 requires the quictls fork.
         git clone --depth 1 --branch openssl-3.1.4-quic1 https://github.com/quictls/openssl.git quictls
@@ -84,12 +84,12 @@ jobs:
     - name: Install Dependencies (macOS)
       if: matrix.os == 'macos-latest'
       run: |
-        brew install cmake openssl libpq hiredis pkg-config nghttp2 libngtcp2 libnghttp3 zlib
+        brew install cmake openssl libpq hiredis pkg-config nghttp2 libngtcp2 libnghttp3 zlib mariadb-connector-c mongo-c-driver
 
     - name: Install Dependencies (Windows)
       if: matrix.os == 'windows-latest'
       run: |
-        vcpkg install pkgconf nghttp2 ngtcp2[openssl] nghttp3 openssl libpq zlib --triplet x64-windows
+        vcpkg install pkgconf nghttp2 ngtcp2[openssl] nghttp3 openssl libpq zlib libmariadb mongo-c-driver --triplet x64-windows
 
     - name: Configure CMake (Ubuntu)
       if: matrix.os == 'ubuntu-latest'
@@ -104,11 +104,11 @@ jobs:
       if: matrix.os == 'macos-latest'
       run: |
         mkdir -p build && cd build
-        export PKG_CONFIG_PATH="$(brew --prefix openssl)/lib/pkgconfig:$(brew --prefix libpq)/lib/pkgconfig:$(brew --prefix libngtcp2)/lib/pkgconfig:$(brew --prefix libnghttp3)/lib/pkgconfig:$(brew --prefix nghttp2)/lib/pkgconfig:$(brew --prefix hiredis)/lib/pkgconfig:$PKG_CONFIG_PATH"
+        export PKG_CONFIG_PATH="$(brew --prefix openssl)/lib/pkgconfig:$(brew --prefix libpq)/lib/pkgconfig:$(brew --prefix libngtcp2)/lib/pkgconfig:$(brew --prefix libnghttp3)/lib/pkgconfig:$(brew --prefix nghttp2)/lib/pkgconfig:$(brew --prefix hiredis)/lib/pkgconfig:$(brew --prefix mariadb-connector-c)/lib/pkgconfig:$(brew --prefix mongo-c-driver)/lib/pkgconfig:$PKG_CONFIG_PATH"
         cmake -DCMAKE_BUILD_TYPE=Release \
           -DOPENSSL_ROOT_DIR=$(brew --prefix openssl) \
           -DPostgreSQL_ROOT=$(brew --prefix libpq) \
-          -DCMAKE_PREFIX_PATH="$(brew --prefix openssl);$(brew --prefix libpq);$(brew --prefix libngtcp2);$(brew --prefix libnghttp3);$(brew --prefix nghttp2);$(brew --prefix hiredis);$(brew --prefix zlib)" \
+          -DCMAKE_PREFIX_PATH="$(brew --prefix openssl);$(brew --prefix libpq);$(brew --prefix libngtcp2);$(brew --prefix libnghttp3);$(brew --prefix nghttp2);$(brew --prefix hiredis);$(brew --prefix zlib);$(brew --prefix mariadb-connector-c);$(brew --prefix mongo-c-driver)" \
           ..
 
     - name: Configure CMake (Windows)
