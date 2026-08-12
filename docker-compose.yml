@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  orbit:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"   # HTTP
+      - "8443:8443"   # HTTPS (TCP)
+      - "8443:8443/udp" # HTTP/3 (QUIC)
+    environment:
+      - PG_HOST=postgres
+      - PG_PORT=5432
+      - PG_USER=orbit_user
+      - PG_PASSWORD=orbit_pass
+      - PG_DBNAME=orbit_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: orbit_user
+      POSTGRES_PASSWORD: orbit_pass
+      POSTGRES_DB: orbit_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orbit_user -d orbit_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+  redisdata:
