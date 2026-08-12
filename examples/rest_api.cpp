@@ -73,6 +73,7 @@ int main() {
         nlohmann::json j = req.json();
         std::string username = j["username"];
         int age = j["age"];
+        (void)age;
 
         HttpResponse res;
         res.status(HttpStatus::Created).send("{\"status\": \"user created\", \"user\": \"" + username + "\"}");

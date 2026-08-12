@@ -3,17 +3,19 @@
 #include "../src/network/Proactor.hpp"
 #include "../src/concurrency/ThreadPool.hpp"
 
+#include "../src/network/PlatformSocket.hpp"
+
 class DummyProactor : public network::Proactor {
 public:
-    void run_once(int) override {}
-    void async_read(int, void*, size_t, std::function<void(ssize_t)>) override {}
-    void async_write(int, const void*, size_t, std::function<void(ssize_t)>) override {}
-    void async_wait_read(int, std::function<void()>) override {}
-    void async_wait_write(int, std::function<void()>) override {}
-    void async_sendfile(int, int, off_t, size_t, std::function<void(ssize_t)>) override {}
-    void async_accept(int, std::function<void(int, sockaddr_in)>) override {}
-    void async_connect(int, const sockaddr_in&, std::function<void(int)>) override {}
-    void remove(int) override {}
+    void run_once(network::socket_t) override {}
+    void async_read(network::socket_t, void*, size_t, std::function<void(ssize_t)>) override {}
+    void async_write(network::socket_t, const void*, size_t, std::function<void(ssize_t)>) override {}
+    void async_wait_read(network::socket_t, std::function<void()>) override {}
+    void async_wait_write(network::socket_t, std::function<void()>) override {}
+    void async_sendfile(network::socket_t, int, off_t, size_t, std::function<void(ssize_t)>) override {}
+    void async_accept(network::socket_t, std::function<void(network::socket_t, sockaddr_in)>) override {}
+    void async_connect(network::socket_t, const sockaddr_in&, std::function<void(int)>) override {}
+    void remove(network::socket_t) override {}
 };
 
 class MockResponseWriter : public http::ResponseWriter {
