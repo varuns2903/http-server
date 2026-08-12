@@ -26,9 +26,9 @@ private:
 
     Listener& listener_;
     std::unique_ptr<network::Proactor> proactor_;
-    ConnectionManager connection_manager_;
     TimerManager timer_manager_;
     concurrency::ThreadPool thread_pool_;
+    ConnectionManager connection_manager_;
     network::UdpSocket* quic_socket_;
     QuicConnectionManager* quic_manager_;
     
