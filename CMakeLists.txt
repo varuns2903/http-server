@@ -99,6 +99,7 @@ add_library(server_core STATIC
     src/database/PostgresClient.cpp
     src/database/MysqlClient.cpp
     src/database/MongoClient.cpp
+    src/openapi/OpenApi.cpp
 )
 
 add_library(HttpServer::core ALIAS server_core)

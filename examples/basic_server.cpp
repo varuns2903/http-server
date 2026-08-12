@@ -85,6 +85,87 @@ int main(int argc, char* argv[]) {
                 writer->send(std::move(res));
             });
 
+            app.get("/api/mongo_test", [](http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> writer) -> utils::Task<void> {
+            auto& thread_pool = global_app->get_thread_pool();
+            database::MongoClient::Config mongo_cfg{"mongodb://localhost:27017", "testdb", "users"};
+            database::MongoClient mongo(thread_pool, mongo_cfg);
+            
+            try {
+                co_await mongo.insert_async("{\"name\": \"Orbit User\", \"role\": \"admin\"}");
+                auto result = co_await mongo.find_async("{\"role\": \"admin\"}");
+                
+                std::string json = "[";
+                for (size_t i = 0; i < result.documents.size(); ++i) {
+                    json += result.documents[i];
+                    if (i < result.documents.size() - 1) json += ",";
+                }
+                json += "]";
+                
+                http::HttpResponse res;
+                res.headers["Content-Type"] = "application/json";
+                res.body = json;
+                writer->send(std::move(res));
+            } catch (const std::exception& e) {
+                http::HttpResponse res;
+                res.status(http::HttpStatus::INTERNAL_SERVER_ERROR);
+                res.body = e.what();
+                writer->send(std::move(res));
+            }
+        });
+
+        openapi::OpenApiRegistry::instance().register_schema("Book", "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"integer\"},\"title\":{\"type\":\"string\"}}}");
+        
+        app.route("/api/books/:id", http::HttpMethod::GET)
+            .summary("Get a book by ID")
+            .description("Retrieves a specific book's details from the library.")
+            .tag("Books")
+            .res_body(200, "Book")
+            .handler([](http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> writer) {
+                http::HttpResponse res;
+                res.headers["Content-Type"] = "application/json";
+                res.body = "{\"id\": " + req.params["id"] + ", \"title\": \"The C++ Programming Language\"}";
+                writer->send(std::move(res));
+            });
+
+        app.get("/swagger.json", [](http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> writer) {
+            std::string json = openapi::OpenApiRegistry::instance().generate_swagger_json("Orbit Framework API", "1.0.0");
+            http::HttpResponse res;
+            res.headers["Content-Type"] = "application/json";
+            res.body = json;
+            writer->send(std::move(res));
+        });
+
+        app.get("/docs", [](http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> writer) {
+            std::string html = R"(
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Swagger UI</title>
+    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css" />
+</head>
+<body>
+    <div id="swagger-ui"></div>
+    <script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js"></script>
+    <script>
+    window.onload = () => {
+        window.ui = SwaggerUIBundle({
+            url: '/swagger.json',
+            dom_id: '#swagger-ui',
+        });
+    };
+    </script>
+</body>
+</html>
+)";
+            http::HttpResponse res;
+            res.headers["Content-Type"] = "text/html";
+            res.body = html;
+            writer->send(std::move(res));
+        });
+    });
+
             api.add_stream_route(http::HttpMethod::POST, "/upload_multipart", [](http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> writer) {
                 auto ct_it = req.headers.find("Content-Type");
                 if (ct_it == req.headers.end() || !ct_it->second.starts_with("multipart/form-data")) {

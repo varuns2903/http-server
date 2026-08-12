@@ -50,48 +50,53 @@ void Router::group(const std::string& prefix, std::function<void(Router&)> callb
     callback(group_router);
 }
 
-void Router::add_route(http::HttpMethod method, const std::string& path, RouteHandler handler) {
+void Router::add_route(http::HttpMethod method, const std::string& path, std::vector<Middleware> mws, RouteHandler handler) {
+    openapi::RouteMetadata empty_meta;
+    add_route_with_meta(method, path, std::move(mws), empty_meta, std::move(handler));
+}
+
+void Router::add_route_with_meta(http::HttpMethod method, const std::string& path, std::vector<Middleware> mws, const openapi::RouteMetadata& meta, RouteHandler handler) {
     std::string full_path = prefix_ + path;
     
-    // Wrap handler with local middlewares
-    RouteHandler wrapped = std::move(handler);
-    if (!local_middlewares_.empty()) {
-        wrapped = [mws = local_middlewares_, h = std::move(wrapped)](http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> w) {
-            for (auto& mw : mws) {
-                if (!mw(req, w)) return;
-            }
-            h(req, w);
-        };
-    }
-    
-    if (parent_) {
-        parent_->add_route(method, full_path, std::move(wrapped));
-        return;
-    }
+    // Register to OpenAPI registry
+    openapi::OpenApiRegistry::instance().register_route(method, full_path, meta);
 
-    if (full_path.find(':') != std::string::npos || full_path.find('*') != std::string::npos) {
+    // Combine router-level middlewares with route-specific middlewares
+    std::vector<Middleware> combined_mws = middlewares_;
+    combined_mws.insert(combined_mws.end(), mws.begin(), mws.end());
+
+    // Wrap handler with middlewares
+    RouteHandler wrapped = [combined_mws, h = std::move(handler)](http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> writer) {
+        for (const auto& mw : combined_mws) {
+            if (!mw(req, writer)) {
+                return; // Middleware aborted the request (e.g., sent an error response)
+            }
+        }
+        h(req, writer);
+    };
+
+    if (full_path.find(':') != std::string::npos) {
         DynamicRoute dr;
         dr.method = method;
         dr.path_segments = split_path(full_path);
         dr.handler = std::move(wrapped);
-        dynamic_routes_.push_back(std::move(dr));
+        if (parent_) {
+            parent_->dynamic_routes_.push_back(std::move(dr));
+        } else {
+            dynamic_routes_.push_back(std::move(dr));
+        }
     } else {
         std::string key = make_route_key(method, full_path);
-        std::cout << "[Router] Registered route: " << key << std::endl;
-        routes_[key] = std::move(wrapped);
+        if (parent_) {
+            parent_->routes_[key] = std::move(wrapped);
+        } else {
+            routes_[key] = std::move(wrapped);
+        }
     }
 }
 
-void Router::add_route(http::HttpMethod method, const std::string& path, std::vector<Middleware> mws, RouteHandler handler) {
-    // Wrap the handler with the route-specific middlewares first
-    RouteHandler wrapped = [mws = std::move(mws), h = std::move(handler)](http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> w) {
-        for (auto& mw : mws) {
-            if (!mw(req, w)) return;
-        }
-        h(req, w);
-    };
-    // Delegate to standard add_route (which will wrap it with group middlewares)
-    add_route(method, path, std::move(wrapped));
+void Router::add_route(http::HttpMethod method, const std::string& path, RouteHandler handler) {
+    add_route(method, path, {}, std::move(handler));
 }
 
 Router& Router::get(const std::string& path, RouteHandler handler) {
@@ -304,6 +309,10 @@ void Router::route(http::HttpRequest& request, std::shared_ptr<http::ResponseWri
         res.status(http::HttpStatus::InternalServerError).send("500 Internal Server Error");
         response_writer->send(std::move(res));
     }
+}
+
+void Router::RouteBuilder::handler(RouteHandler h) {
+    router_.add_route_with_meta(method_, path_, std::move(mws_), meta_, std::move(h));
 }
 
 } // namespace routing

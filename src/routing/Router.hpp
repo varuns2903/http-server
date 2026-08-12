@@ -3,6 +3,7 @@
 #include "../http/HttpResponse.hpp"
 #include "../http/WebSocketConnection.hpp"
 #include "../http/ResponseWriter.hpp"
+#include "../openapi/OpenApi.hpp"
 #include <functional>
 #include <unordered_map>
 #include <unordered_set>
@@ -28,12 +29,37 @@ public:
     Router(const std::string& prefix = "", Router* parent = nullptr) 
         : prefix_(prefix), parent_(parent) {}
 
+    class RouteBuilder {
+    public:
+        RouteBuilder(Router& router, http::HttpMethod method, const std::string& path, std::vector<Middleware> mws = {})
+            : router_(router), method_(method), path_(path), mws_(std::move(mws)) {}
+        
+        RouteBuilder& summary(const std::string& s) { meta_.summary = s; return *this; }
+        RouteBuilder& description(const std::string& s) { meta_.description = s; return *this; }
+        RouteBuilder& tag(const std::string& t) { meta_.tags.push_back(t); return *this; }
+        RouteBuilder& req_body(const std::string& schema_name) { meta_.request_body_schema = schema_name; return *this; }
+        RouteBuilder& res_body(int status, const std::string& schema_name) { meta_.response_schemas[status] = schema_name; return *this; }
+        
+        void handler(RouteHandler h);
+    private:
+        Router& router_;
+        http::HttpMethod method_;
+        std::string path_;
+        std::vector<Middleware> mws_;
+        openapi::RouteMetadata meta_;
+    };
+
+    RouteBuilder route(const std::string& path, http::HttpMethod method = http::HttpMethod::GET) {
+        return RouteBuilder(*this, method, path);
+    }
+
     // Route Grouping
     void group(const std::string& prefix, std::function<void(Router&)> callback);
 
     // Register a handler for a specific HTTP method and path
     void add_route(http::HttpMethod method, const std::string& path, RouteHandler handler);
     void add_route(http::HttpMethod method, const std::string& path, std::vector<Middleware> mws, RouteHandler handler);
+    void add_route_with_meta(http::HttpMethod method, const std::string& path, std::vector<Middleware> mws, const openapi::RouteMetadata& meta, RouteHandler handler);
     
     // Fluent routing API
     Router& get(const std::string& path, RouteHandler handler);
