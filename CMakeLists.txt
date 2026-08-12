@@ -27,6 +27,7 @@ find_package(OpenSSL REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(PostgreSQL REQUIRED)
 find_package(PkgConfig REQUIRED)
+pkg_check_modules(MARIADB REQUIRED libmariadb)
 pkg_check_modules(NGHTTP2 REQUIRED libnghttp2)
 pkg_check_modules(NGTCP2 REQUIRED libngtcp2)
 pkg_search_module(NGTCP2_CRYPTO REQUIRED libngtcp2_crypto_openssl libngtcp2_crypto_ossl libngtcp2_crypto_quictls)
@@ -95,6 +96,7 @@ add_library(server_core STATIC
     src/middleware/Metrics.cpp
     src/database/RedisClient.cpp
     src/database/PostgresClient.cpp
+    src/database/MysqlClient.cpp
 )
 
 add_library(HttpServer::core ALIAS server_core)
@@ -105,6 +107,7 @@ target_link_libraries(server_core
         OpenSSL::Crypto
         ZLIB::ZLIB
         ${PostgreSQL_LIBRARIES}
+        ${MARIADB_LIBRARIES}
         ${NGHTTP2_LIBRARIES}
         ${NGTCP2_LIBRARIES}
         ${NGTCP2_CRYPTO_LIBRARIES}
@@ -113,6 +116,7 @@ target_link_libraries(server_core
 )
 
 target_link_directories(server_core PUBLIC
+    ${MARIADB_LIBRARY_DIRS}
     ${NGHTTP2_LIBRARY_DIRS}
     ${NGTCP2_LIBRARY_DIRS}
     ${NGTCP2_CRYPTO_LIBRARY_DIRS}
@@ -127,6 +131,7 @@ endif()
 
 target_include_directories(server_core PUBLIC 
     ${PostgreSQL_INCLUDE_DIRS}
+    ${MARIADB_INCLUDE_DIRS}
     ${NGHTTP2_INCLUDE_DIRS}
     ${NGTCP2_INCLUDE_DIRS}
     ${NGTCP2_CRYPTO_INCLUDE_DIRS}

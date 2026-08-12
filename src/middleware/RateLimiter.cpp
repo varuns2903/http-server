@@ -21,12 +21,13 @@ bool RateLimiter::operator()(http::HttpRequest& req, std::shared_ptr<http::Respo
             if (elapsed >= window_) {
                 bucket.tokens = max_requests_;
                 bucket.last_refill = now;
-            } else {
-                double rate = static_cast<double>(max_requests_) / window_.count();
-                size_t new_tokens = static_cast<size_t>(elapsed.count() * rate);
+            }
+            if (elapsed > std::chrono::seconds(0)) {
+                double rate = static_cast<double>(max_requests_) / static_cast<double>(window_.count());
+                size_t new_tokens = static_cast<size_t>(static_cast<double>(elapsed.count()) * rate);
                 if (new_tokens > 0) {
                     bucket.tokens = std::min(max_requests_, bucket.tokens + new_tokens);
-                    bucket.last_refill = bucket.last_refill + std::chrono::seconds(static_cast<long long>(new_tokens / rate));
+                    bucket.last_refill = bucket.last_refill + std::chrono::seconds(static_cast<long long>(static_cast<double>(new_tokens) / rate));
                 }
             }
         }

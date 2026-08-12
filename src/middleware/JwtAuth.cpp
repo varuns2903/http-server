@@ -48,18 +48,18 @@ static std::string base64url_decode(const std::string& input) {
     return std::string(reinterpret_cast<char*>(out.data()), dec_len - padding);
 }
 
-static bool verify_jwt_signature(const std::string& header_b64, const std::string& payload_b64, const std::string& signature_b64, const std::string& secret) {
-    std::string data = header_b64 + "." + payload_b64;
+static bool verify_jwt_signature(const std::string& header_b64, const std::string& payload_b64, const std::string& provided_signature, const std::string& secret) {
+    std::string data_to_sign = header_b64 + "." + payload_b64;
     
     unsigned char hash[EVP_MAX_MD_SIZE];
     unsigned int hash_len;
     
-    HMAC(EVP_sha256(), secret.data(), secret.length(), 
-         reinterpret_cast<const unsigned char*>(data.data()), data.length(), 
+    HMAC(EVP_sha256(), secret.data(), static_cast<int>(secret.length()), 
+         reinterpret_cast<const unsigned char*>(data_to_sign.data()), data_to_sign.length(), 
          hash, &hash_len);
          
-    std::string expected_signature = base64url_encode(hash, hash_len);
-    return signature_b64 == expected_signature;
+    std::string expected_signature = base64url_encode(hash, static_cast<int>(hash_len));
+    return provided_signature == expected_signature;
 }
 
 routing::Middleware jwt_auth(const std::string& secret_key) {

@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y \
     zlib1g-dev \
     libnghttp2-dev \
     liburing-dev \
+    libmariadb-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Build quictls (OpenSSL fork with QUIC support)
@@ -72,6 +73,7 @@ RUN apt-get update && apt-get install -y \
     zlib1g \
     libnghttp2-14 \
     liburing2 \
+    libmariadb-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy compiled QUIC/HTTP3 libraries from builder

@@ -8,6 +8,7 @@
 #include "middleware/Metrics.hpp"
 #include "database/RedisClient.hpp"
 #include "database/PostgresClient.hpp"
+#include "../src/database/MysqlClient.hpp"
 #include "config/Config.hpp"
 #include "http/MultipartForm.hpp"
 #include "http/MultipartStreamParser.hpp"
