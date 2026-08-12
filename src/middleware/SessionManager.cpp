@@ -8,9 +8,9 @@ SessionManager::SessionManager(const std::string& redis_host, int redis_port)
     : redis_(std::make_shared<database::RedisClient>(redis_host, redis_port)) {}
 
 std::string SessionManager::generate_session_id() {
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    static std::uniform_int_distribution<> dis(0, 15);
+    thread_local std::random_device rd;
+    thread_local std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(0, 15);
     const char* hex = "0123456789abcdef";
     
     std::string uuid = "";
