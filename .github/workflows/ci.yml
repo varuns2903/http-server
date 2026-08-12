@@ -28,7 +28,7 @@ jobs:
         LD_LIBRARY_PATH: /usr/local/ssl/lib
       run: |
         sudo apt-get update
-        sudo apt-get install -y cmake g++ libpq-dev libhiredis-dev pkg-config zlib1g-dev
+        sudo apt-get install -y cmake g++ libpq-dev libhiredis-dev pkg-config zlib1g-dev valgrind wrk
         sudo apt-get install -y libnghttp2-dev liburing-dev
 
         # Ubuntu's system OpenSSL lacks QUIC support, and ngtcp2 requires the quictls fork.
@@ -126,3 +126,21 @@ jobs:
       run: |
         cd build
         ctest -C Release --output-on-failure
+
+    - name: Run Memory Leak Detection (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        cd build
+        export LD_LIBRARY_PATH="/usr/local/quictls/lib:$LD_LIBRARY_PATH"
+        valgrind --leak-check=full --error-exitcode=1 ./http_server_tests
+
+    - name: Run Load Test (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        cd build
+        export LD_LIBRARY_PATH="/usr/local/quictls/lib:$LD_LIBRARY_PATH"
+        ./basic_server &
+        SERVER_PID=$!
+        sleep 2
+        wrk -t2 -c100 -d10s http://127.0.0.1:8080/
+        kill $SERVER_PID
