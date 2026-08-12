@@ -164,7 +164,6 @@ int main(int argc, char* argv[]) {
             res.body = html;
             writer->send(std::move(res));
         });
-    });
 
             api.add_stream_route(http::HttpMethod::POST, "/upload_multipart", [](http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> writer) {
                 auto ct_it = req.headers.find("Content-Type");
