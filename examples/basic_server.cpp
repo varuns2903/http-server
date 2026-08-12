@@ -34,7 +34,9 @@ int main(int argc, char* argv[]) {
 
         signal(SIGINT, handle_signal);
         signal(SIGTERM, handle_signal);
+#ifndef _WIN32
         signal(SIGPIPE, SIG_IGN);
+#endif
 
         // Global Middleware (Logging)
         app.use([](http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> /*writer*/) {
