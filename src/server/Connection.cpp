@@ -443,8 +443,8 @@ void Connection::send(http::HttpResponse&& response) {
                 thread_pool_.enqueue([self]() {
                     self->process_request();
                 });
-                return;
             }
+            return;
         }
         trigger_read();
     }
@@ -488,8 +488,8 @@ void Connection::end() {
                 thread_pool_.enqueue([self]() {
                     self->process_request();
                 });
-                return;
             }
+            return;
         }
         trigger_read();
     }

@@ -132,6 +132,8 @@ void App::listen() {
     sigaction(SIGINT, &action, nullptr);
     sigaction(SIGTERM, &action, nullptr);
     sigaction(SIGUSR2, &action, nullptr);
+    action.sa_handler = SIG_IGN;
+    sigaction(SIGPIPE, &action, nullptr);
 #else
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
