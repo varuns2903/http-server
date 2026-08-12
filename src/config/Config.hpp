@@ -18,7 +18,7 @@ struct ServerConfig {
     bool enable_quic{true}; // Enable HTTP/3 QUIC
     std::string ssl_cert{""};
     std::string ssl_key{""};
-    EventEngine engine{EventEngine::Epoll}; // Default to Epoll for thread-safe stability
+    EventEngine engine{EventEngine::IoUring}; // Default to our new fast backend!
     
     static ServerConfig parse(int argc, char* argv[]);
 };

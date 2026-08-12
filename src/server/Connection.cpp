@@ -194,8 +194,8 @@ void Connection::on_read_complete(ssize_t bytes_read) {
     RequestState state = check_request_state();
     
     if (state == RequestState::COMPLETE || state == RequestState::HEADERS_COMPLETE) {
-        if (!is_processing_request_) {
-            is_processing_request_ = true;
+        bool expected = false;
+        if (is_processing_request_.compare_exchange_strong(expected, true)) {
             if (state == RequestState::HEADERS_COMPLETE) {
                 state_ = ConnectionState::HTTP_STREAMING_BODY;
             }
@@ -422,10 +422,9 @@ void Connection::send(http::HttpResponse&& response) {
 
     send_data(serialized_data);
     
-    is_processing_request_ = false;
     RequestState state = check_request_state();
     if (state == RequestState::COMPLETE) {
-        is_processing_request_ = true;
+        // We already hold is_processing_request_ == true from the current request
         auto self = shared_from_this();
         thread_pool_.enqueue([self]() {
             self->process_request();
@@ -435,6 +434,18 @@ void Connection::send(http::HttpResponse&& response) {
     } else if (state == RequestState::ERROR_HEADERS_TOO_LARGE) {
         send_error(http::HttpStatus::RequestHeaderFieldsTooLarge, "431 Request Header Fields Too Large");
     } else {
+        is_processing_request_ = false;
+        // Double check state after releasing the lock, just in case data was appended concurrently
+        if (check_request_state() == RequestState::COMPLETE) {
+            bool expected = false;
+            if (is_processing_request_.compare_exchange_strong(expected, true)) {
+                auto self = shared_from_this();
+                thread_pool_.enqueue([self]() {
+                    self->process_request();
+                });
+                return;
+            }
+        }
         trigger_read();
     }
 }
@@ -458,10 +469,8 @@ void Connection::end() {
         send_data("0\r\n\r\n");
     }
     
-    is_processing_request_ = false;
     RequestState state = check_request_state();
     if (state == RequestState::COMPLETE) {
-        is_processing_request_ = true;
         auto self = shared_from_this();
         thread_pool_.enqueue([self]() {
             self->process_request();
@@ -471,6 +480,17 @@ void Connection::end() {
     } else if (state == RequestState::ERROR_HEADERS_TOO_LARGE) {
         send_error(http::HttpStatus::RequestHeaderFieldsTooLarge, "431 Request Header Fields Too Large");
     } else {
+        is_processing_request_ = false;
+        if (check_request_state() == RequestState::COMPLETE) {
+            bool expected = false;
+            if (is_processing_request_.compare_exchange_strong(expected, true)) {
+                auto self = shared_from_this();
+                thread_pool_.enqueue([self]() {
+                    self->process_request();
+                });
+                return;
+            }
+        }
         trigger_read();
     }
 }
