@@ -22,6 +22,7 @@ ServerConfig ServerConfig::parse(int argc, char* argv[]) {
                       << "  -c, --ssl-cert <file>         SSL certificate file (enables HTTPS)\n"
                       << "  -k, --ssl-key <file>          SSL private key file\n"
                       << "  -e, --engine <engine>         Event loop engine (epoll, iouring) (default: epoll)\n"
+                      << "  -v, --http-version <version>  HTTP version to enable (1.1, 2, 3) (default: 1.1)\n"
                       << "  -h, --help                    Show this help message\n";
             std::exit(0);
         } else if ((arg == "-p" || arg == "--port") && i + 1 < argc) {
@@ -46,6 +47,18 @@ ServerConfig ServerConfig::parse(int argc, char* argv[]) {
                 cfg.engine = EventEngine::IoUring;
             } else {
                 std::cerr << "Invalid engine: " << engine_str << ". Must be 'epoll' or 'iouring'\n";
+                std::exit(1);
+            }
+        } else if ((arg == "-v" || arg == "--http-version") && i + 1 < argc) {
+            std::string version_str = argv[++i];
+            if (version_str == "1.1") {
+                cfg.http_version = HttpVersion::Http1_1;
+            } else if (version_str == "2") {
+                cfg.http_version = HttpVersion::Http2;
+            } else if (version_str == "3") {
+                cfg.http_version = HttpVersion::Http3;
+            } else {
+                std::cerr << "Invalid HTTP version: " << version_str << ". Must be '1.1', '2', or '3'\n";
                 std::exit(1);
             }
         } else {

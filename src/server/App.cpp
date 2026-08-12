@@ -34,7 +34,7 @@ App::App(const config::ServerConfig& config) : config_(config) {
     network::initialize_platform_networking();
     utils::Logger::init(config.log_level);
     if (!config_.ssl_cert.empty() && !config_.ssl_key.empty()) {
-        tls_context_ = std::make_unique<network::TlsContext>(config_.ssl_cert, config_.ssl_key);
+        tls_context_ = std::make_unique<network::TlsContext>(config_.ssl_cert, config_.ssl_key, config_.http_version);
     }
 }
 
@@ -142,12 +142,16 @@ void App::listen() {
     listener_ = std::make_unique<Listener>(config_.port);
     listener_->start();
     
-    if (config_.enable_quic) {
-        quic_socket_ = std::make_unique<network::UdpSocket>();
-        quic_socket_->set_non_blocking();
-        quic_socket_->bind(config_.port);
-        quic_manager_ = std::make_unique<QuicConnectionManager>(*quic_socket_, tls_context_ ? tls_context_->get() : nullptr);
-        LOG_INFO("HTTP/3 QUIC enabled on UDP port " << config_.port);
+    if (config_.http_version == config::HttpVersion::Http3) {
+        if (!tls_context_) {
+            LOG_WARN("HTTP/3 QUIC is enabled but no SSL certificates were provided. QUIC requires TLS. Disabling QUIC.");
+        } else {
+            quic_socket_ = std::make_unique<network::UdpSocket>();
+            quic_socket_->set_non_blocking();
+            quic_socket_->bind(config_.port);
+            quic_manager_ = std::make_unique<QuicConnectionManager>(*quic_socket_, tls_context_->get());
+            LOG_INFO("HTTP/3 QUIC enabled on UDP port " << config_.port);
+        }
     }
     
     event_loop_ = std::make_unique<EventLoop>(*listener_, router_, config_, tls_context_.get(), quic_socket_.get(), quic_manager_.get());

@@ -3,12 +3,13 @@
 #include <stdexcept>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#include "../config/Config.hpp"
 
 namespace network {
 
 class TlsContext {
 public:
-    TlsContext(const std::string& cert_file, const std::string& key_file);
+    TlsContext(const std::string& cert_file, const std::string& key_file, config::HttpVersion http_version);
     ~TlsContext();
 
     // Delete copy semantics
@@ -16,9 +17,11 @@ public:
     TlsContext& operator=(const TlsContext&) = delete;
 
     SSL_CTX* get() const { return ctx_; }
+    config::HttpVersion get_http_version() const { return http_version_; }
 
 private:
     SSL_CTX* ctx_{nullptr};
+    config::HttpVersion http_version_{config::HttpVersion::Http1_1};
 };
 
 class ClientTlsContext {

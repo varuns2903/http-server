@@ -6,20 +6,40 @@ namespace network {
 
 static int alpn_select_cb(SSL* ssl, const unsigned char** out, unsigned char* outlen,
                           const unsigned char* in, unsigned int inlen, void* arg) {
-    static const unsigned char alpn_protos[] = {
-        2, 'h', '3',
-        2, 'h', '2',
-        8, 'h', 't', 't', 'p', '/', '1', '.', '1'
-    };
+    auto* ctx = static_cast<TlsContext*>(arg);
+    config::HttpVersion version = ctx ? ctx->get_http_version() : config::HttpVersion::Http3;
 
-    if (SSL_select_next_proto((unsigned char**)out, outlen, alpn_protos, sizeof(alpn_protos), in, inlen) == OPENSSL_NPN_NEGOTIATED) {
-        return SSL_TLSEXT_ERR_OK;
+    if (version == config::HttpVersion::Http1_1) {
+        static const unsigned char alpn_http1_1[] = {
+            8, 'h', 't', 't', 'p', '/', '1', '.', '1'
+        };
+        if (SSL_select_next_proto((unsigned char**)out, outlen, alpn_http1_1, sizeof(alpn_http1_1), in, inlen) == OPENSSL_NPN_NEGOTIATED) {
+            return SSL_TLSEXT_ERR_OK;
+        }
+    } else if (version == config::HttpVersion::Http2) {
+        static const unsigned char alpn_http2[] = {
+            2, 'h', '2',
+            8, 'h', 't', 't', 'p', '/', '1', '.', '1'
+        };
+        if (SSL_select_next_proto((unsigned char**)out, outlen, alpn_http2, sizeof(alpn_http2), in, inlen) == OPENSSL_NPN_NEGOTIATED) {
+            return SSL_TLSEXT_ERR_OK;
+        }
+    } else {
+        static const unsigned char alpn_http3[] = {
+            2, 'h', '3',
+            2, 'h', '2',
+            8, 'h', 't', 't', 'p', '/', '1', '.', '1'
+        };
+        if (SSL_select_next_proto((unsigned char**)out, outlen, alpn_http3, sizeof(alpn_http3), in, inlen) == OPENSSL_NPN_NEGOTIATED) {
+            return SSL_TLSEXT_ERR_OK;
+        }
     }
     
     return SSL_TLSEXT_ERR_NOACK;
 }
 
-TlsContext::TlsContext(const std::string& cert_file, const std::string& key_file) {
+TlsContext::TlsContext(const std::string& cert_file, const std::string& key_file, config::HttpVersion http_version) 
+    : http_version_(http_version) {
     const SSL_METHOD* method = TLS_server_method();
     ctx_ = SSL_CTX_new(method);
     if (!ctx_) {
@@ -29,7 +49,7 @@ TlsContext::TlsContext(const std::string& cert_file, const std::string& key_file
     SSL_CTX_set_min_proto_version(ctx_, TLS1_2_VERSION);
     
     // Set ALPN callback
-    SSL_CTX_set_alpn_select_cb(ctx_, alpn_select_cb, nullptr);
+    SSL_CTX_set_alpn_select_cb(ctx_, alpn_select_cb, this);
 
     if (SSL_CTX_use_certificate_chain_file(ctx_, cert_file.c_str()) <= 0) {
         ERR_print_errors_fp(stderr);
