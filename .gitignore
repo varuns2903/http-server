@@ -6,3 +6,5 @@ compile_commands.json
 *.pem
 *.key
 *.crt
+build_docker/
+load_test.py
