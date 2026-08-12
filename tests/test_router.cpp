@@ -7,7 +7,7 @@
 
 class DummyProactor : public network::Proactor {
 public:
-    void run_once(network::socket_t) override {}
+    void run_once(int) override {}
     void async_read(network::socket_t, void*, size_t, std::function<void(ssize_t)>) override {}
     void async_write(network::socket_t, const void*, size_t, std::function<void(ssize_t)>) override {}
     void async_wait_read(network::socket_t, std::function<void()>) override {}
