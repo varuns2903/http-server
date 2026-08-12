@@ -1,13 +1,14 @@
 #include "QuicHttp3Session.hpp"
 #include "../http/HttpResponse.hpp"
 
+#include "QuicConnection.hpp"
+#include "../routing/Router.hpp"
+#include <iostream>
+
 #ifdef _WIN32
 #undef DELETE
 #undef ERROR
 #endif
-#include "QuicConnection.hpp"
-#include "../routing/Router.hpp"
-#include <iostream>
 
 namespace server {
 

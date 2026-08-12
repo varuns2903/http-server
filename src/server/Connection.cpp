@@ -10,6 +10,16 @@
 #endif
 #include <iostream>
 #include "../network/PlatformSocket.hpp"
+#ifdef _WIN32
+#include <io.h>
+#define close _close
+#define open _open
+inline ssize_t pread(int fd, void* buf, size_t count, long offset) {
+    _lseek(fd, offset, SEEK_SET);
+    return _read(fd, buf, static_cast<unsigned int>(count));
+}
+#endif
+
 
 namespace server {
 

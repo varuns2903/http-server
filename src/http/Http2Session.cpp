@@ -12,11 +12,13 @@ inline ssize_t pread(int fd, void* buf, size_t count, long offset) {
 #include <iostream>
 #ifndef _WIN32
 #include <unistd.h>
-#else
+#endif
+#include <sys/types.h>
+
+#ifdef _WIN32
 #undef DELETE
 #undef ERROR
 #endif
-#include <sys/types.h>
 
 namespace http {
 namespace h2 {

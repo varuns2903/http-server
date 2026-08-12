@@ -16,6 +16,11 @@
 #include "../concurrency/ThreadPool.hpp"
 #include "../network/TlsContext.hpp"
 
+#ifdef _WIN32
+#undef DELETE
+#undef ERROR
+#endif
+
 namespace middleware {
 
 // Global client TLS context for the proxy
@@ -82,9 +87,16 @@ public:
                 self->fail("Failed to create socket");
                 return;
             }
+            #ifdef _WIN32
+            u_long mode = 1;
+            ioctlsocket(self->fd_, FIONBIO, &mode);
+#else
             fcntl(self->fd_, F_SETFL, fcntl(self->fd_, F_GETFL, 0) | O_NONBLOCK);
+#endif
 #ifdef FD_CLOEXEC
+            #ifndef _WIN32
             fcntl(self->fd_, F_SETFD, fcntl(self->fd_, F_GETFD, 0) | FD_CLOEXEC);
+#endif
 #endif
 
             // 3. Connect asynchronously (thread-safe on Proactor)
