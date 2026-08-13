@@ -38,7 +38,7 @@ if(TARGET mongo::mongoc_shared)
 elseif(TARGET mongo::mongoc_static)
     set(MONGOC_LIBRARIES mongo::mongoc_static)
 else()
-    pkg_search_module(MONGOC REQUIRED libmongoc-1.0 mongoc-1.0)
+    pkg_search_module(MONGOC REQUIRED libmongoc-1.0 mongoc-1.0 mongoc2)
 endif()
 
 pkg_check_modules(NGHTTP2 REQUIRED libnghttp2)
