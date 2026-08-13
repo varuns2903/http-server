@@ -29,7 +29,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y cmake g++ libpq-dev libhiredis-dev pkg-config zlib1g-dev valgrind wrk
-        sudo apt-get install -y libnghttp2-dev liburing-dev libmariadb-dev libmongoc-dev libbson-dev
+        sudo apt-get install -y libnghttp2-dev liburing-dev libmariadb-dev libmongoc-dev libbson-dev libcurl4-openssl-dev
 
         # Ubuntu's system OpenSSL lacks QUIC support, and ngtcp2 requires the quictls fork.
         git clone --depth 1 --branch openssl-3.1.4-quic1 https://github.com/quictls/openssl.git quictls
@@ -84,7 +84,7 @@ jobs:
     - name: Install Dependencies (macOS)
       if: matrix.os == 'macos-latest'
       run: |
-        brew install cmake openssl libpq hiredis pkg-config nghttp2 libngtcp2 libnghttp3 zlib mariadb-connector-c mongo-c-driver
+        brew install cmake openssl libpq hiredis pkg-config nghttp2 libngtcp2 libnghttp3 zlib mariadb-connector-c mongo-c-driver curl
 
 
     - name: Configure CMake (Ubuntu)
