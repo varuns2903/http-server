@@ -10,11 +10,28 @@
 
 namespace middleware {
 
+/**
+ * @ingroup middlewares
+ * @brief Middleware for in-memory rate limiting.
+ */
 class RateLimiter {
 public:
+    /**
+     * @brief Constructs a new Rate Limiter.
+     * 
+     * @param max_requests Maximum number of requests allowed in the time window.
+     * @param window The time window for rate limiting.
+     */
     RateLimiter(size_t max_requests, std::chrono::seconds window);
     
-    // The middleware handler
+    /**
+     * @brief Middleware execution operator.
+     * 
+     * @param req The HTTP request.
+     * @param writer The HTTP response writer.
+     * @return true If the request is allowed.
+     * @return false If the request is rate-limited.
+     */
     bool operator()(http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> writer);
 
 private:
@@ -29,7 +46,14 @@ private:
     std::mutex mutex_;
 };
 
-// Helper function to easily register middleware
+/**
+ * @ingroup middlewares
+ * @brief Helper function to easily register rate limiting middleware.
+ * 
+ * @param max_requests Maximum number of requests allowed in the time window.
+ * @param window The time window for rate limiting.
+ * @return A middleware handler function.
+ */
 inline auto rate_limit(size_t max_requests, std::chrono::seconds window) {
     return [limiter = std::make_shared<RateLimiter>(max_requests, window)](http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> writer) -> bool {
         return (*limiter)(req, writer);
