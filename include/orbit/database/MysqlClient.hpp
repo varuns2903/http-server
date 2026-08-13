@@ -10,8 +10,14 @@
 
 namespace database {
 
+/**
+ * @brief An asynchronous MySQL client using coroutines and a network Proactor.
+ */
 class MysqlClient {
 public:
+    /**
+     * @brief Configuration options for the MySQL client.
+     */
     struct Config {
         std::string host;
         int port{3306};
@@ -29,6 +35,12 @@ public:
         uint64_t affected_rows{0};
     };
 
+    /**
+     * @brief Constructs a new MysqlClient.
+     * 
+     * @param proactor The network Proactor to use for async events.
+     * @param config The configuration settings for the MySQL connection.
+     */
     MysqlClient(network::Proactor& proactor, const Config& config);
     ~MysqlClient();
 
@@ -68,12 +80,40 @@ public:
         MYSQL_RES* res{nullptr};
     };
 
+    /**
+     * @brief Connects to the MySQL database asynchronously.
+     * 
+     * @return A ConnectAwaiter that can be co_awaited.
+     */
     ConnectAwaiter connect_async();
+
+    /**
+     * @brief Executes a query asynchronously.
+     * 
+     * @param query The SQL query string.
+     * @return A QueryAwaiter that can be co_awaited for the result.
+     * 
+     * @code
+     * auto result = co_await client.query_async("SELECT * FROM users");
+     * @endcode
+     */
     QueryAwaiter query_async(std::string query);
 
+    /**
+     * @brief Closes the MySQL connection.
+     */
     void close();
 
+    /**
+     * @brief Gets the associated network proactor.
+     * @return Reference to the network Proactor.
+     */
     network::Proactor& get_proactor() { return proactor_; }
+
+    /**
+     * @brief Gets the underlying MySQL connection object.
+     * @return Pointer to the MYSQL object.
+     */
     MYSQL* get_mysql() { return mysql_; }
 
 private:

@@ -9,15 +9,31 @@
 
 namespace database {
 
+/**
+ * @brief A thread-safe connection pool for managing reusable database client connections.
+ * 
+ * @tparam ClientType The type of database client to manage.
+ */
 template <typename ClientType>
 class ConnectionPool : public std::enable_shared_from_this<ConnectionPool<ClientType>> {
 public:
     using ClientFactory = std::function<std::shared_ptr<ClientType>()>;
     
+    /**
+     * @brief Constructs a new ConnectionPool.
+     * 
+     * @param max_size The maximum number of connections to maintain in the pool.
+     * @param factory A callable that creates new instances of ClientType.
+     */
     ConnectionPool(size_t max_size, ClientFactory factory)
         : max_size_(max_size), factory_(std::move(factory)) {}
 
-    // Initialize the pool by establishing connections
+    /**
+     * @brief Initializes the pool by establishing the initial set of connections.
+     * 
+     * @param connector A function used to connect a client asynchronously.
+     * @param on_ready Callback invoked when the pool is initialized. The parameter is true if initialization was successful.
+     */
     void init(std::function<void(std::shared_ptr<ClientType>, std::function<void(bool)>)> connector, std::function<void(bool success)> on_ready) {
         if (max_size_ == 0) {
             on_ready(true);
@@ -46,7 +62,11 @@ public:
         }
     }
 
-    // Acquire a connection asynchronously
+    /**
+     * @brief Acquires a database connection asynchronously from the pool.
+     * 
+     * @param callback Callback invoked with a shared pointer to a ready client when available.
+     */
     void acquire(std::function<void(std::shared_ptr<ClientType>)> callback) {
         std::lock_guard<std::mutex> lock(mutex_);
         if (!idle_connections_.empty()) {
@@ -59,7 +79,11 @@ public:
         }
     }
 
-    // Release a connection back to the pool
+    /**
+     * @brief Releases a connection back to the pool.
+     * 
+     * @param client The client to return to the pool.
+     */
     void release(std::shared_ptr<ClientType> client) {
         std::lock_guard<std::mutex> lock(mutex_);
         if (!wait_queue_.empty()) {
