@@ -128,6 +128,22 @@ int main(int argc, char* argv[]) {
                 writer->send(std::move(res));
             });
 
+        openapi::OpenApiRegistry::instance().register_schema("CreateUserRequest", "{\"type\":\"object\",\"properties\":{\"username\":{\"type\":\"string\"},\"age\":{\"type\":\"integer\"}}}");
+        
+        app.route("/api/users", http::HttpMethod::POST)
+            .summary("Create a new user")
+            .description("Creates a new user with the given username and age.")
+            .tag("Users")
+            .req_body("CreateUserRequest")
+            .res_body(201, "{\"type\":\"object\",\"properties\":{\"status\":{\"type\":\"string\"}}}")
+            .handler([](http::HttpRequest& /*req*/, std::shared_ptr<http::ResponseWriter> writer) {
+                http::HttpResponse res;
+                res.status(http::HttpStatus::Created);
+                res.headers["Content-Type"] = "application/json";
+                res.body = "{\"status\": \"user created successfully\"}";
+                writer->send(std::move(res));
+            });
+
         // Enable OpenAPI and Swagger UI at /docs
         app.enable_openapi("Orbit API", "1.0.0");
 
