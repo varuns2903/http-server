@@ -1,6 +1,7 @@
 #include <orbit/server/App.hpp>
 #include <orbit/utils/Logger.hpp>
 #include <orbit/utils/PrometheusRegistry.hpp>
+#include <orbit/openapi/OpenApi.hpp>
 #include <orbit/network/ConnectionPool.hpp>
 #include <orbit/network/PlatformSocket.hpp>
 #include <csignal>
@@ -119,6 +120,47 @@ App& App::enable_metrics(const std::string& path) {
         response.set_body(utils::PrometheusRegistry::get_instance().expose(), "text/plain; version=0.0.4");
         res->send(std::move(response));
     });
+    return *this;
+}
+
+App& App::enable_openapi(const std::string& title, const std::string& version, const std::string& docs_path, const std::string& json_path) {
+    this->get(json_path, [title, version](const http::HttpRequest&, std::shared_ptr<http::ResponseWriter> res) {
+        std::string json = openapi::OpenApiRegistry::instance().generate_swagger_json(title, version);
+        http::HttpResponse response;
+        response.status(http::HttpStatus::OK);
+        response.set_body(json, "application/json");
+        res->send(std::move(response));
+    });
+
+    this->get(docs_path, [json_path](const http::HttpRequest&, std::shared_ptr<http::ResponseWriter> res) {
+        std::string html = R"(
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Swagger UI</title>
+    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css" />
+</head>
+<body>
+    <div id="swagger-ui"></div>
+    <script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js"></script>
+    <script>
+    window.onload = () => {
+        window.ui = SwaggerUIBundle({
+            url: ')" + json_path + R"(',
+            dom_id: '#swagger-ui',
+        });
+    };
+    </script>
+</body>
+</html>)";
+        http::HttpResponse response;
+        response.status(http::HttpStatus::OK);
+        response.set_body(html, "text/html");
+        res->send(std::move(response));
+    });
+    
     return *this;
 }
 

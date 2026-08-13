@@ -67,6 +67,12 @@ public:
     // Metrics
     App& enable_metrics(const std::string& path = "/metrics");
 
+    // OpenAPI & Swagger UI
+    App& enable_openapi(const std::string& title = "Orbit Framework API", 
+                        const std::string& version = "1.0.0", 
+                        const std::string& docs_path = "/docs", 
+                        const std::string& json_path = "/swagger.json");
+
     // Start the server (blocking)
     void listen();
     
