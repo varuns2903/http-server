@@ -20,6 +20,8 @@ public:
     void stop();
     void stop_accepting();
 
+    concurrency::ThreadPool& get_thread_pool() { return thread_pool_; }
+
 private:
     void do_accept();
     void do_read_quic();

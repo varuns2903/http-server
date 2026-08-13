@@ -30,6 +30,10 @@ public:
         return *this;
     }
 
+    routing::Router::RouteBuilder route(const std::string& path, http::HttpMethod method = http::HttpMethod::GET) {
+        return router_.route(path, method);
+    }
+
     // Fluent routing API
     App& get(const std::string& path, routing::RouteHandler handler);
     App& get(const std::string& path, std::vector<routing::Middleware> mws, routing::RouteHandler handler);
@@ -53,6 +57,11 @@ public:
     App& ws(const std::string& path, routing::WsHandler handler) {
         router_.ws(path, std::move(handler));
         return *this;
+    }
+
+    concurrency::ThreadPool& get_thread_pool() {
+        if (!event_loop_) throw std::runtime_error("Server not started");
+        return event_loop_->get_thread_pool();
     }
 
     // Metrics

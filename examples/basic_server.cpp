@@ -14,6 +14,7 @@
 #include "http/MultipartForm.hpp"
 #include "http/MultipartStreamParser.hpp"
 #include "utils/Logger.hpp"
+#include "../src/concurrency/Task.hpp"
 #include "middleware/Proxy.hpp"
 #include <iostream>
 #include <csignal>
@@ -64,7 +65,7 @@ int main(int argc, char* argv[]) {
         app.use(middleware::session("127.0.0.1", 6379));
 
         // API Group
-        app.group("/api/v1", [](routing::Router& api) {
+        app.group("/api/v1", [&app](routing::Router& api) {
             api.add_route(http::HttpMethod::GET, "/users", [](const http::HttpRequest& /*req*/, std::shared_ptr<http::ResponseWriter> writer) {
                 http::HttpResponse res;
                 res.body = "List of users";
@@ -85,7 +86,7 @@ int main(int argc, char* argv[]) {
                 writer->send(std::move(res));
             });
 
-            app.get("/api/mongo_test", [](http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> writer) -> utils::Task<void> {
+            app.get("/api/mongo_test", [](http::HttpRequest& /*req*/, std::shared_ptr<http::ResponseWriter> writer) -> concurrency::Task {
             auto& thread_pool = global_app->get_thread_pool();
             database::MongoClient::Config mongo_cfg{"mongodb://localhost:27017", "testdb", "users"};
             database::MongoClient mongo(thread_pool, mongo_cfg);
@@ -127,7 +128,7 @@ int main(int argc, char* argv[]) {
                 writer->send(std::move(res));
             });
 
-        app.get("/swagger.json", [](http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> writer) {
+        app.get("/swagger.json", [](http::HttpRequest& /*req*/, std::shared_ptr<http::ResponseWriter> writer) {
             std::string json = openapi::OpenApiRegistry::instance().generate_swagger_json("Orbit Framework API", "1.0.0");
             http::HttpResponse res;
             res.headers["Content-Type"] = "application/json";
@@ -135,7 +136,7 @@ int main(int argc, char* argv[]) {
             writer->send(std::move(res));
         });
 
-        app.get("/docs", [](http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> writer) {
+        app.get("/docs", [](http::HttpRequest& /*req*/, std::shared_ptr<http::ResponseWriter> writer) {
             std::string html = R"(
 <!DOCTYPE html>
 <html lang="en">
@@ -210,7 +211,7 @@ int main(int argc, char* argv[]) {
                 );
             });
 
-            api.add_stream_route(http::HttpMethod::POST, "/upload", [](http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> res) {
+            api.add_stream_route(http::HttpMethod::POST, "/upload", [](http::HttpRequest& /*req*/, std::shared_ptr<http::ResponseWriter> res) {
                 auto total_bytes = std::make_shared<size_t>(0);
                 
                 res->read_body_stream(
