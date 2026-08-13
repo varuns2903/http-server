@@ -111,6 +111,7 @@ add_library(server_core STATIC
     src/middleware/SessionManager.cpp
     src/middleware/Validation.cpp
     src/middleware/Metrics.cpp
+    src/middleware/Csrf.cpp
     src/database/RedisClient.cpp
     src/database/PostgresClient.cpp
     src/database/MysqlClient.cpp
