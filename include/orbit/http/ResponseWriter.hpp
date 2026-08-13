@@ -9,41 +9,85 @@ namespace concurrency { class ThreadPool; }
 
 namespace http {
 
+/**
+ * @brief Abstract interface for writing HTTP responses.
+ * @details This is used by middlewares and route handlers to write data back to the client.
+ */
 class ResponseWriter {
 public:
     virtual ~ResponseWriter() = default;
 
     using Interceptor = std::function<void(HttpResponse&)>;
+    /**
+     * @brief Adds an interceptor to modify the response before it is sent.
+     * @param interceptor The interceptor callback.
+     */
     virtual void add_interceptor(Interceptor interceptor) = 0;
 
-    // Add a default header that will be included in the final response
+    /**
+     * @brief Adds a default header that will be included in the final response.
+     * @param key The header name.
+     * @param value The header value.
+     */
     virtual void set_header(const std::string& key, const std::string& value) = 0;
 
-    // Get the underlying Proactor to dispatch async operations (like proxying)
+    /**
+     * @brief Gets the underlying Proactor to dispatch async operations.
+     * @return A reference to the network::Proactor.
+     */
     virtual network::Proactor& proactor() = 0;
     
-    // Get the thread pool to offload blocking tasks like DNS resolution
+    /**
+     * @brief Gets the thread pool to offload blocking tasks.
+     * @return A reference to the concurrency::ThreadPool.
+     */
     virtual concurrency::ThreadPool& thread_pool() = 0;
 
-    // Send a complete HTTP response (takes ownership of file descriptors if any)
+    /**
+     * @brief Sends a complete HTTP response.
+     * @details Takes ownership of any file descriptors managed by the response.
+     * @param response The HttpResponse to send.
+     */
     virtual void send(HttpResponse&& response) = 0;
 
-    // Send only headers (useful for streaming bodies)
+    /**
+     * @brief Sends only the HTTP headers.
+     * @details Useful for streaming bodies or Server-Sent Events.
+     * @param response The HttpResponse containing the headers to send.
+     */
     virtual void send_headers(HttpResponse& response) = 0;
 
-    // Stream a chunk of data (for Chunked Transfer Encoding)
+    /**
+     * @brief Streams a chunk of data (for Chunked Transfer Encoding).
+     * @param chunk The data chunk to write.
+     */
     virtual void write_chunk(std::string_view chunk) = 0;
 
-    // End a chunked stream
+    /**
+     * @brief Ends a chunked response stream.
+     */
     virtual void end() = 0;
 
-    // Send a Server-Sent Events (SSE) message
+    /**
+     * @brief Sends a Server-Sent Events (SSE) message.
+     * @param data The event data payload.
+     * @param event The event type/name (optional).
+     * @param id The event ID (optional).
+     */
     virtual void send_sse_event(std::string_view data, std::string_view event = "", std::string_view id = "") = 0;
 
-    // Take over the connection for raw bi-directional byte streaming (e.g. WebSocket Proxying)
+    /**
+     * @brief Upgrades the connection to a raw bi-directional byte stream.
+     * @param on_data Callback invoked when data is received.
+     * @param on_close Callback invoked when the stream is closed.
+     */
     virtual void upgrade_to_raw_stream(std::function<void(std::string_view)> on_data, std::function<void()> on_close) = 0;
     
-    // Asynchronously stream the incoming HTTP request body
+    /**
+     * @brief Asynchronously streams the incoming HTTP request body.
+     * @param on_data Callback invoked when a body chunk is received.
+     * @param on_end Callback invoked when the entire body has been read.
+     */
     virtual void read_body_stream(std::function<void(std::string_view)> on_data, std::function<void()> on_end) = 0;
 };
 

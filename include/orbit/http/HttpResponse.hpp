@@ -8,6 +8,9 @@
 
 namespace http {
 
+/**
+ * @brief Standard HTTP status codes.
+ */
 enum class HttpStatus {
     SwitchingProtocols = 101,
     OK = 200,
@@ -27,6 +30,9 @@ enum class HttpStatus {
     InternalServerError = 500
 };
 
+/**
+ * @brief Represents an HTTP cookie.
+ */
 struct Cookie {
     std::string name;
     std::string value;
@@ -38,6 +44,9 @@ struct Cookie {
     std::string same_site; // "Strict", "Lax", "None"
 };
 
+/**
+ * @brief Represents an HTTP response to be sent to a client.
+ */
 class HttpResponse {
 public:
     std::vector<Cookie> cookies;
@@ -60,11 +69,22 @@ public:
     HttpResponse(const HttpResponse&) = delete;
     HttpResponse& operator=(const HttpResponse&) = delete;
 
+    /**
+     * @brief Adds a cookie to the response.
+     * @param cookie The Cookie object to add.
+     * @return A reference to this HttpResponse for method chaining.
+     */
     HttpResponse& set_cookie(const Cookie& cookie) {
         cookies.push_back(cookie);
         return *this;
     }
 
+    /**
+     * @brief Adds a simple key-value cookie to the response.
+     * @param name The name of the cookie.
+     * @param value The value of the cookie.
+     * @return A reference to this HttpResponse for method chaining.
+     */
     HttpResponse& set_cookie(const std::string& name, const std::string& value) {
         Cookie c;
         c.name = name;
@@ -73,25 +93,73 @@ public:
         return *this;
     }
 
+    /**
+     * @brief Sets the response body and its content type.
+     * @param b The response body content.
+     * @param content_type The MIME type of the body (default: "text/plain").
+     */
     void set_body(const std::string& b, const std::string& content_type = "text/plain");
     
     // Ergonomic fluent helpers
+    /**
+     * @brief Sets the HTTP status code of the response.
+     * @param code The HttpStatus code to set.
+     * @return A reference to this HttpResponse for method chaining.
+     */
     HttpResponse& status(HttpStatus code) {
         status_code = code;
         return *this;
     }
+    /**
+     * @brief Sets the response body as plain text.
+     * @param b The text content to send.
+     */
     void send(const std::string& b) { set_body(b, "text/plain"); }
+    
+    /**
+     * @brief Sets the response body as JSON from a string.
+     * @param j The JSON string content.
+     */
     void json(const std::string& j) { set_body(j, "application/json"); }
+    
+    /**
+     * @brief Sets the response body as JSON from a nlohmann::json object.
+     * @param j The nlohmann::json object to send.
+     */
     void json(const nlohmann::json& j) { set_body(j.dump(), "application/json"); }
+    
+    /**
+     * @brief Sets the response body as HTML.
+     * @param h The HTML string content.
+     */
     void html(const std::string& h) { set_body(h, "text/html"); }
     
     // Server-Side Rendering
+    /**
+     * @brief Renders a template and sets it as the HTML response body.
+     * @param template_path The path to the template file.
+     * @param data The JSON data to inject into the template.
+     */
     void render(const std::string& template_path, const nlohmann::json& data);
     
     // Opens the file and sets up headers for sendfile()
+    /**
+     * @brief Prepares a file to be sent using zero-copy (sendfile).
+     * @param path The path to the file to send.
+     * @param content_type The MIME type of the file.
+     */
     void send_file(const std::string& path, const std::string& content_type);
 
+    /**
+     * @brief Serializes the entire response (headers and body) to a string.
+     * @return The serialized HTTP response string.
+     */
     std::string serialize() const;
+
+    /**
+     * @brief Serializes only the response headers to a string.
+     * @return The serialized HTTP response headers string.
+     */
     std::string serialize_headers() const;
 };
 

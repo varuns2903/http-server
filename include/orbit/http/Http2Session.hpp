@@ -20,6 +20,9 @@ namespace server {
 namespace http {
 namespace h2 {
 
+/**
+ * @brief Manages an HTTP/2 session over a connection.
+ */
 class Http2Session {
 public:
     Http2Session(server::Connection& connection, const routing::Router& router, concurrency::ThreadPool& thread_pool);
@@ -28,7 +31,12 @@ public:
     void process_data(const uint8_t* data, size_t len);
     void send_pending();
     
-    // Thread-safe API for ResponseWriter
+    /**
+     * @brief Thread-safe API to submit an HTTP/2 response.
+     * @param stream_id The HTTP/2 stream identifier.
+     * @param response The HttpResponse to send.
+     * @param has_body True if the response includes a body.
+     */
     void submit_response(int32_t stream_id, const http::HttpResponse& response, bool has_body);
     void submit_data(int32_t stream_id);
     void end_stream(int32_t stream_id);
@@ -78,6 +86,9 @@ private:
     void dispatch_request(std::shared_ptr<StreamContext> stream_ctx);
 };
 
+/**
+ * @brief ResponseWriter implementation for HTTP/2 streams.
+ */
 class Http2ResponseWriter : public http::ResponseWriter {
 public:
     Http2ResponseWriter(Http2Session* session, int32_t stream_id);
