@@ -11,8 +11,19 @@
 
 namespace server {
 
+/**
+ * @brief The main application class for the Orbit Framework.
+ * 
+ * The App class acts as the central orchestrator for the web framework. It manages the server's lifecycle,
+ * routing, middlewares, dependency injection, and worker thread pools. 
+ * Users instantiate this class, define their routes, and call `listen()` to start accepting connections.
+ */
 class App {
 public:
+    /**
+     * @brief Constructs a new App instance.
+     * @param config The server configuration containing port, worker threads, and event engine preferences.
+     */
     App(const config::ServerConfig& config);
     ~App();
 
