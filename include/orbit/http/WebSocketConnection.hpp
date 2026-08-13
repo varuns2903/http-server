@@ -13,16 +13,37 @@ namespace server {
 namespace http {
 namespace websocket {
 
+/**
+ * @brief Represents an active WebSocket connection.
+ */
 class WebSocketConnection {
 public:
     explicit WebSocketConnection(server::Connection& underlying_connection, bool enable_deflate = false);
     ~WebSocketConnection();
 
     // User-facing API
+
+    /**
+     * @brief Registers a callback to be called when a message is received.
+     * @param handler The callback function.
+     */
     void on_message(std::function<void(const std::string&)> handler);
+
+    /**
+     * @brief Registers a callback to be called when the connection is closed.
+     * @param handler The callback function.
+     */
     void on_close(std::function<void()> handler);
     
+    /**
+     * @brief Sends a text message over the WebSocket connection.
+     * @param message The message to send.
+     */
     void send(const std::string& message);
+
+    /**
+     * @brief Closes the WebSocket connection gracefully.
+     */
     void close();
 
     // Internal API called by Connection::handle_read when in WEBSOCKET state

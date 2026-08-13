@@ -34,19 +34,55 @@ enum class RequestState {
     ERROR_HEADERS_TOO_LARGE
 };
 
+/**
+ * @brief Represents an active client connection, handling request parsing and response writing.
+ */
 class Connection : public std::enable_shared_from_this<Connection>, public http::ResponseWriter {
 public:
+    /**
+     * @brief Constructs a new Connection.
+     * @param socket The connection socket.
+     * @param client_ip The client's IP address.
+     * @param proactor The Proactor for async I/O.
+     * @param router The application router.
+     * @param manager The connection manager.
+     * @param thread_pool The application thread pool.
+     * @param timer_manager The timer manager for timeouts.
+     * @param max_body_size Maximum allowed request body size.
+     * @param tls_context The TLS context, if applicable.
+     */
     Connection(network::Socket socket, const std::string& client_ip, network::Proactor& proactor, const routing::Router& router, ConnectionManager& manager, concurrency::ThreadPool& thread_pool, TimerManager& timer_manager, size_t max_body_size, network::TlsContext* tls_context = nullptr);
     ~Connection();
 
     Connection(const Connection&) = delete;
     Connection& operator=(const Connection&) = delete;
 
+    /**
+     * @brief Starts processing the connection.
+     */
     void start();
 
+    /**
+     * @brief Writes raw data to the connection.
+     * @param data The raw data to write.
+     */
     void write_raw(const std::vector<char>& data);
+    
+    /**
+     * @brief Marks the connection to be closed after writing completes.
+     */
     void mark_for_close();
+    
+    /**
+     * @brief Upgrades the connection to a WebSocket.
+     * @param ws_conn The WebSocket connection instance.
+     */
     void upgrade_to_websocket(std::unique_ptr<http::websocket::WebSocketConnection> ws_conn);
+    
+    /**
+     * @brief Gets the client's IP address.
+     * @return The IP address string.
+     */
     const std::string& client_ip() const { return client_ip_; }
 
     // ResponseWriter Implementation

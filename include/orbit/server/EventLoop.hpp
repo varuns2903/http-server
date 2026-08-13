@@ -13,13 +13,46 @@
 
 namespace server {
 
+/**
+ * @brief Manages the server's event loop, handling I/O operations and dispatching tasks.
+ */
 class EventLoop {
 public:
+    /**
+     * @brief Constructs an EventLoop.
+     * @param listener The server listener.
+     * @param router The router instance.
+     * @param config The server configuration.
+     * @param tls_context The TLS context (optional).
+     * @param quic_socket The QUIC UDP socket (optional).
+     * @param quic_manager The QUIC connection manager (optional).
+     */
     EventLoop(Listener& listener, const routing::Router& router, const config::ServerConfig& config, network::TlsContext* tls_context = nullptr, network::UdpSocket* quic_socket = nullptr, QuicConnectionManager* quic_manager = nullptr);
+    
+    /**
+     * @brief Starts the event loop.
+     * 
+     * @code
+     * EventLoop loop(listener, router, config);
+     * loop.run();
+     * @endcode
+     */
     void run();
+    
+    /**
+     * @brief Stops the event loop.
+     */
     void stop();
+    
+    /**
+     * @brief Stops accepting new connections but continues processing existing ones.
+     */
     void stop_accepting();
 
+    /**
+     * @brief Gets the thread pool.
+     * @return Reference to the thread pool.
+     */
     concurrency::ThreadPool& get_thread_pool() { return thread_pool_; }
 
 private:

@@ -11,8 +11,14 @@
 
 namespace http {
 
+/**
+ * @brief Represents standard HTTP methods.
+ */
 enum class HttpMethod { GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD, UNKNOWN };
 
+/**
+ * @brief Represents an incoming HTTP request.
+ */
 struct HttpRequest {
     HttpMethod method{HttpMethod::UNKNOWN};
     std::string uri;
@@ -28,6 +34,11 @@ struct HttpRequest {
 
     mutable nlohmann::json json_body; // Cached parsed JSON
     
+    /**
+     * @brief Parses and returns the request body as a JSON object.
+     * @details Caches the parsed JSON object for subsequent calls.
+     * @return nlohmann::json object containing the parsed body, or an empty object if the body is empty or invalid.
+     */
     nlohmann::json json() const {
         if (!json_body.empty()) return json_body;
         if (body.empty()) return nlohmann::json::object();
@@ -35,6 +46,10 @@ struct HttpRequest {
         return json_body;
     }
 
+    /**
+     * @brief Parses the request body as multipart/form-data.
+     * @return MultipartForm object containing the parsed fields and files. Returns an empty form if the content type is not multipart/form-data.
+     */
     MultipartForm form() const {
         auto ct = headers.find("Content-Type");
         if (ct != headers.end() && ct->second.starts_with("multipart/form-data")) {

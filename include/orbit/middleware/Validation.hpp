@@ -5,6 +5,10 @@
 
 namespace middleware {
 
+/**
+ * @ingroup middlewares
+ * @brief Enumeration of JSON data types.
+ */
 enum class JsonType {
     STRING,
     NUMBER,
@@ -13,15 +17,26 @@ enum class JsonType {
     ARRAY
 };
 
+/**
+ * @ingroup middlewares
+ * @brief Represents a field in a validation schema.
+ */
 struct SchemaField {
     std::string name;
     JsonType type;
     bool required = true;
 };
 
-// Returns a middleware that parses the request body as JSON and validates it against the schema.
-// If valid, the parsed JSON is available in req.json_body (we will need to add this to HttpRequest).
-// If invalid, it intercepts the request and responds with a 422 Unprocessable Entity.
+/**
+ * @ingroup middlewares
+ * @brief Returns a middleware that parses and validates a JSON request body.
+ * 
+ * If valid, the parsed JSON is available in req.json_body.
+ * If invalid, it intercepts the request and responds with a 422 Unprocessable Entity.
+ * 
+ * @param schema The schema to validate against.
+ * @return routing::Middleware The validation middleware handler.
+ */
 routing::Middleware validate_json(const std::vector<SchemaField>& schema);
 
 } // namespace middleware

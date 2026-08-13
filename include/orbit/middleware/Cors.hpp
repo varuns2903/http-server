@@ -5,6 +5,10 @@
 
 namespace middleware {
 
+/**
+ * @ingroup middlewares
+ * @brief Options for configuring CORS (Cross-Origin Resource Sharing).
+ */
 struct CorsOptions {
     std::vector<std::string> allowed_origins = {"*"};
     std::vector<std::string> allowed_methods = {"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"};
@@ -13,7 +17,13 @@ struct CorsOptions {
     int max_age = 86400; // 24 hours default
 };
 
-// Returns a middleware that handles CORS (Cross-Origin Resource Sharing)
+/**
+ * @ingroup middlewares
+ * @brief Returns a middleware that handles CORS.
+ *
+ * @param options The CORS configuration options.
+ * @return routing::Middleware The CORS middleware handler.
+ */
 routing::Middleware cors(CorsOptions options = CorsOptions{});
 
 } // namespace middleware

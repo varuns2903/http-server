@@ -6,6 +6,9 @@
 
 namespace http {
 
+/**
+ * @brief Represents a file uploaded via multipart/form-data.
+ */
 struct MultipartFile {
     std::string name;
     std::string filename;
@@ -13,11 +16,20 @@ struct MultipartFile {
     std::string_view content;
 };
 
+/**
+ * @brief Represents parsed multipart/form-data content.
+ */
 class MultipartForm {
 public:
     std::unordered_map<std::string, std::string> fields;
     std::vector<MultipartFile> files;
 
+    /**
+     * @brief Parses a multipart/form-data request body.
+     * @param content_type_header The Content-Type header containing the boundary.
+     * @param body The raw request body.
+     * @return A parsed MultipartForm object.
+     */
     static MultipartForm parse(std::string_view content_type_header, std::string_view body);
 };
 

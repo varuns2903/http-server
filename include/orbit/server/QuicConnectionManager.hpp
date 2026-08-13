@@ -30,13 +30,34 @@ struct QuicConnectionIdEqual {
     }
 };
 
+/**
+ * @brief Manages QUIC connections.
+ */
 class QuicConnectionManager {
 public:
+    /**
+     * @brief Constructs a QuicConnectionManager.
+     * @param socket The UDP socket for QUIC.
+     * @param ssl_ctx The SSL context for QUIC.
+     */
     QuicConnectionManager(network::UdpSocket& socket, SSL_CTX* ssl_ctx);
     ~QuicConnectionManager();
 
-    // Process an incoming UDP packet
+    /**
+     * @brief Processes an incoming UDP packet for QUIC.
+     * @param data The packet data.
+     * @param datalen The length of the data.
+     * @param remote_addr The remote address of the sender.
+     */
     void on_packet_received(const uint8_t* data, size_t datalen, const sockaddr_in& remote_addr);
+    
+    /**
+     * @brief Sends a QUIC packet to a remote address.
+     * @param data The packet data.
+     * @param datalen The length of the data.
+     * @param remote_addr The remote address.
+     * @param remote_addrlen The length of the remote address struct.
+     */
     void send_packet(const uint8_t* data, size_t datalen, const sockaddr* remote_addr, socklen_t remote_addrlen);
 
 private:    // Periodically handle QUIC timers for all connections

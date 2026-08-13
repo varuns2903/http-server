@@ -11,13 +11,39 @@
 
 namespace server {
 
+/**
+ * @brief Manages active HTTP connections.
+ */
 class ConnectionManager {
 public:
+    /**
+     * @brief Constructs a ConnectionManager.
+     * @param proactor The proactor for I/O.
+     * @param router The router.
+     * @param thread_pool The thread pool.
+     * @param timer_manager The timer manager.
+     * @param max_body_size The maximum body size allowed.
+     * @param tls_context The TLS context (optional).
+     */
     ConnectionManager(network::Proactor& proactor, const routing::Router& router, concurrency::ThreadPool& thread_pool, TimerManager& timer_manager, size_t max_body_size, network::TlsContext* tls_context = nullptr);
 
+    /**
+     * @brief Adds a new connection to the manager.
+     * @param socket The connection socket.
+     * @param client_ip The client's IP address.
+     */
     void add_connection(network::Socket socket, const std::string& client_ip);
+    
+    /**
+     * @brief Removes a connection by file descriptor.
+     * @param fd The file descriptor.
+     */
     void remove_connection(int fd);
     
+    /**
+     * @brief Gets the current number of active connections.
+     * @return The number of connections.
+     */
     size_t get_connection_count() const;
 
 private:

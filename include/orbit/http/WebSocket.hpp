@@ -6,8 +6,16 @@
 namespace http {
 namespace websocket {
 
+/**
+ * @brief Utility class for WebSocket handshakes.
+ */
 class Handshake {
 public:
+    /**
+     * @brief Generates the Sec-WebSocket-Accept key for the WebSocket handshake.
+     * @param client_key The base64-encoded Sec-WebSocket-Key from the client request.
+     * @return The base64-encoded response key to send back to the client.
+     */
     static std::string generate_accept_key(const std::string& client_key) {
         const std::string magic_string = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
         std::string combined = client_key + magic_string;
