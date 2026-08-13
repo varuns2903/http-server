@@ -26,6 +26,7 @@ endif()
 find_package(OpenSSL REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(PostgreSQL REQUIRED)
+find_package(CURL REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_search_module(MARIADB REQUIRED libmariadb mariadb)
 find_package(mongoc-1.0 CONFIG QUIET)
@@ -112,6 +113,7 @@ add_library(server_core STATIC
     src/middleware/Validation.cpp
     src/middleware/Metrics.cpp
     src/middleware/Csrf.cpp
+    src/middleware/OAuth2.cpp
     src/database/RedisClient.cpp
     src/database/PostgresClient.cpp
     src/database/MysqlClient.cpp
@@ -134,6 +136,7 @@ target_link_libraries(server_core
         ${NGTCP2_CRYPTO_LIBRARIES}
         ${NGHTTP3_LIBRARIES}
         inja
+        CURL::libcurl
 )
 
 target_link_directories(server_core PUBLIC

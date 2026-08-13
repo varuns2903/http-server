@@ -92,6 +92,8 @@ std::string HttpResponse::serialize_headers() const {
         case HttpStatus::OK: oss << "200 OK\r\n"; break;
         case HttpStatus::Created: oss << "201 Created\r\n"; break;
         case HttpStatus::NoContent: oss << "204 No Content\r\n"; break;
+        case HttpStatus::MovedPermanently: oss << "301 Moved Permanently\r\n"; break;
+        case HttpStatus::Found: oss << "302 Found\r\n"; break;
         case HttpStatus::NotModified: oss << "304 Not Modified\r\n"; break;
         case HttpStatus::BadRequest: oss << "400 Bad Request\r\n"; break;
         case HttpStatus::Unauthorized: oss << "401 Unauthorized\r\n"; break;
