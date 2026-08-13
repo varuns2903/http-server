@@ -21,6 +21,7 @@ struct HttpRequest {
     std::unordered_map<std::string_view, std::string_view, utils::CaseInsensitiveHash, utils::CaseInsensitiveEqual> headers;
     std::string_view body;
     std::unordered_map<std::string, std::string> params;
+    std::unordered_map<std::string, std::string> cookies;
     std::string client_ip;
     std::string session_id; // Set by SessionManager middleware
     nlohmann::json user; // Populated by JwtAuth middleware

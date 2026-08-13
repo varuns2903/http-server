@@ -20,39 +20,24 @@ std::string SessionManager::generate_session_id() {
     return uuid;
 }
 
-std::string SessionManager::extract_cookie(const std::string_view& cookie_header, const std::string& name) {
-    std::string cookies(cookie_header);
-    std::istringstream stream(cookies);
-    std::string cookie;
-    while (std::getline(stream, cookie, ';')) {
-        // trim leading spaces
-        size_t start = cookie.find_first_not_of(" ");
-        if (start != std::string::npos) {
-            cookie = cookie.substr(start);
-        }
-        
-        size_t eq = cookie.find('=');
-        if (eq != std::string::npos) {
-            std::string key = cookie.substr(0, eq);
-            if (key == name) {
-                return cookie.substr(eq + 1);
-            }
-        }
-    }
-    return "";
-}
 
 bool SessionManager::operator()(http::HttpRequest& req, std::shared_ptr<http::ResponseWriter> writer) {
     std::string session_id;
-    
-    auto it = req.headers.find("Cookie");
-    if (it != req.headers.end()) {
-        session_id = extract_cookie(it->second, "session_id");
+    auto it = req.cookies.find("session_id");
+    if (it != req.cookies.end()) {
+        session_id = it->second;
     }
     
     if (session_id.empty()) {
         session_id = generate_session_id();
-        writer->set_header("Set-Cookie", "session_id=" + session_id + "; Path=/; HttpOnly");
+        writer->add_interceptor([session_id](http::HttpResponse& res) {
+            http::Cookie c;
+            c.name = "session_id";
+            c.value = session_id;
+            c.path = "/";
+            c.http_only = true;
+            res.set_cookie(c);
+        });
     }
     
     req.session_id = session_id;

@@ -17,6 +17,7 @@ namespace http {
 HttpResponse::HttpResponse(HttpResponse&& other) noexcept 
     : status_code(other.status_code),
       headers(std::move(other.headers)),
+      cookies(std::move(other.cookies)),
       body(std::move(other.body)),
       file_fd(other.file_fd),
       file_size(other.file_size) {
@@ -28,6 +29,7 @@ HttpResponse& HttpResponse::operator=(HttpResponse&& other) noexcept {
         if (file_fd != -1) close(file_fd);
         status_code = other.status_code;
         headers = std::move(other.headers);
+        cookies = std::move(other.cookies);
         body = std::move(other.body);
         file_fd = other.file_fd;
         file_size = other.file_size;
@@ -109,7 +111,19 @@ std::string HttpResponse::serialize_headers() const {
     bool has_content_length = false;
     for (const auto& [key, value] : headers) {
         if (key == "Content-Length") has_content_length = true;
+        // Don't emit raw Set-Cookie if we are using the new cookies array, but we allow it for backwards compatibility for now
         oss << key << ": " << value << "\r\n";
+    }
+
+    for (const auto& cookie : cookies) {
+        oss << "Set-Cookie: " << cookie.name << "=" << cookie.value;
+        if (!cookie.path.empty()) oss << "; Path=" << cookie.path;
+        if (!cookie.domain.empty()) oss << "; Domain=" << cookie.domain;
+        if (cookie.max_age >= 0) oss << "; Max-Age=" << cookie.max_age;
+        if (cookie.secure) oss << "; Secure";
+        if (cookie.http_only) oss << "; HttpOnly";
+        if (!cookie.same_site.empty()) oss << "; SameSite=" << cookie.same_site;
+        oss << "\r\n";
     }
 
     if (!has_content_length && !body.empty()) {

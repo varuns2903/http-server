@@ -27,8 +27,20 @@ enum class HttpStatus {
     InternalServerError = 500
 };
 
+struct Cookie {
+    std::string name;
+    std::string value;
+    std::string path = "/";
+    std::string domain;
+    long max_age = -1;
+    bool secure = false;
+    bool http_only = false;
+    std::string same_site; // "Strict", "Lax", "None"
+};
+
 class HttpResponse {
 public:
+    std::vector<Cookie> cookies;
     HttpStatus status_code = HttpStatus::OK;
     std::unordered_map<std::string, std::string, utils::CaseInsensitiveHash, utils::CaseInsensitiveEqual> headers;
     std::string body;
@@ -47,6 +59,19 @@ public:
     // Disable copy to prevent double-closing FDs
     HttpResponse(const HttpResponse&) = delete;
     HttpResponse& operator=(const HttpResponse&) = delete;
+
+    HttpResponse& set_cookie(const Cookie& cookie) {
+        cookies.push_back(cookie);
+        return *this;
+    }
+
+    HttpResponse& set_cookie(const std::string& name, const std::string& value) {
+        Cookie c;
+        c.name = name;
+        c.value = value;
+        cookies.push_back(c);
+        return *this;
+    }
 
     void set_body(const std::string& b, const std::string& content_type = "text/plain");
     

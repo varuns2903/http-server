@@ -17,7 +17,6 @@ public:
     // or passing the manager's connection. But for simplicity, users will use a global DB connection.
 private:
     std::string generate_session_id();
-    std::string extract_cookie(const std::string_view& cookie_header, const std::string& name);
 
     std::shared_ptr<database::RedisClient> redis_;
 };
