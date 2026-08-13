@@ -1,4 +1,4 @@
-#include "Config.hpp"
+#include <orbit/config/Config.hpp>
 #include <iostream>
 #include <cstdlib>
 #include <cstdlib>

@@ -29,7 +29,7 @@ This document outlines the strategic future of the Orbit HTTP Framework. The roa
 *Goal: Ensure the framework runs natively and asynchronously across all major operating systems.*
 
 - [ ] **macOS / FreeBSD (`kqueue`):** Develop a `KqueueProactor` implementation so the framework can run natively on Apple hardware without Docker or Linux virtual machines.
-- [ ] **Windows (`IOCP`):** Develop an Input/Output Completion Ports (`IOCP`) Proactor to bring native, zero-overhead asynchronous performance to Windows environments.
+
 
 ## Phase 5: Observability & DevOps (Category 5)
 *Goal: Equip system administrators with enterprise telemetry.*

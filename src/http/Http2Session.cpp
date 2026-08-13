@@ -1,4 +1,4 @@
-#include "Http2Session.hpp"
+#include <orbit/http/Http2Session.hpp>
 #ifdef _WIN32
 #include <io.h>
 #define close _close
@@ -8,7 +8,7 @@ inline ssize_t pread(int fd, void* buf, size_t count, long offset) {
     return _read(fd, buf, static_cast<unsigned int>(count));
 }
 #endif
-#include "../server/Connection.hpp"
+#include <orbit/server/Connection.hpp>
 #include <iostream>
 #ifndef _WIN32
 #include <unistd.h>

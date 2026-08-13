@@ -1,10 +1,10 @@
-#include "ConnectionPool.hpp"
+#include <orbit/network/ConnectionPool.hpp>
 #ifndef _WIN32
 #include <unistd.h>
 #endif
 #include <stdexcept>
 #include <iostream>
-#include "PlatformSocket.hpp"
+#include <orbit/network/PlatformSocket.hpp>
 #ifndef MSG_DONTWAIT
 #define MSG_DONTWAIT 0
 #endif

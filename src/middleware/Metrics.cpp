@@ -1,5 +1,5 @@
-#include "Metrics.hpp"
-#include "../utils/PrometheusRegistry.hpp"
+#include <orbit/middleware/Metrics.hpp>
+#include <orbit/utils/PrometheusRegistry.hpp>
 #include <chrono>
 
 namespace middleware {

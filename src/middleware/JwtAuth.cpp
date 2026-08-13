@@ -1,5 +1,5 @@
-#include "JwtAuth.hpp"
-#include "../http/HttpResponse.hpp"
+#include <orbit/middleware/JwtAuth.hpp>
+#include <orbit/http/HttpResponse.hpp>
 #include <openssl/hmac.h>
 #include <openssl/evp.h>
 #include <vector>

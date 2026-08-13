@@ -1,10 +1,10 @@
-#include "Listener.hpp"
-#include "../network/PlatformSocket.hpp"
+#include <orbit/server/Listener.hpp>
+#include <orbit/network/PlatformSocket.hpp>
 #include <stdexcept>
 #include <cerrno>
 #include <cstring>
 #include <iostream>
-#include "../utils/Logger.hpp"
+#include <orbit/utils/Logger.hpp>
 
 namespace server {
 

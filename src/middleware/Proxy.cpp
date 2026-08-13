@@ -1,7 +1,7 @@
-#include "Proxy.hpp"
-#include "../network/Proactor.hpp"
-#include "../utils/Logger.hpp"
-#include "../network/PlatformSocket.hpp"
+#include <orbit/middleware/Proxy.hpp>
+#include <orbit/network/Proactor.hpp>
+#include <orbit/utils/Logger.hpp>
+#include <orbit/network/PlatformSocket.hpp>
 
 
 #ifndef _WIN32
@@ -12,9 +12,9 @@
 
 #include <memory>
 #include <mutex>
-#include "../network/ConnectionPool.hpp"
-#include "../concurrency/ThreadPool.hpp"
-#include "../network/TlsContext.hpp"
+#include <orbit/network/ConnectionPool.hpp>
+#include <orbit/concurrency/ThreadPool.hpp>
+#include <orbit/network/TlsContext.hpp>
 
 #ifdef _WIN32
 #undef DELETE

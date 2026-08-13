@@ -1,15 +1,15 @@
-#include "Connection.hpp"
-#include "ConnectionManager.hpp"
-#include "../http/HttpParser.hpp"
-#include "../http/WebSocket.hpp"
-#include "../http/WebSocketConnection.hpp"
-#include "../http/Http2Session.hpp"
-#include "../config/Config.hpp"
+#include <orbit/server/Connection.hpp>
+#include <orbit/server/ConnectionManager.hpp>
+#include <orbit/http/HttpParser.hpp>
+#include <orbit/http/WebSocket.hpp>
+#include <orbit/http/WebSocketConnection.hpp>
+#include <orbit/http/Http2Session.hpp>
+#include <orbit/config/Config.hpp>
 #ifndef _WIN32
 #include <unistd.h>
 #endif
 #include <iostream>
-#include "../network/PlatformSocket.hpp"
+#include <orbit/network/PlatformSocket.hpp>
 #ifdef _WIN32
 #include <io.h>
 #define close _close

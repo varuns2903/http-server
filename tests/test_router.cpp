@@ -1,9 +1,9 @@
 #include <gtest/gtest.h>
-#include "../src/routing/Router.hpp"
-#include "../src/network/Proactor.hpp"
-#include "../src/concurrency/ThreadPool.hpp"
+#include <orbit/routing/Router.hpp>
+#include <orbit/network/Proactor.hpp>
+#include <orbit/concurrency/ThreadPool.hpp>
 
-#include "../src/network/PlatformSocket.hpp"
+#include <orbit/network/PlatformSocket.hpp>
 
 class DummyProactor : public network::Proactor {
 public:

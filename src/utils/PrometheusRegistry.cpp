@@ -1,4 +1,4 @@
-#include "PrometheusRegistry.hpp"
+#include <orbit/utils/PrometheusRegistry.hpp>
 #include <sstream>
 
 namespace utils {

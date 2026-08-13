@@ -1,10 +1,10 @@
-#include "../src/server/App.hpp"
-#include "../src/config/Config.hpp"
-#include "../src/database/PostgresClient.hpp"
-#include "../src/database/PostgresCoro.hpp"
-#include "../src/concurrency/Task.hpp"
-#include "../src/middleware/Validation.hpp"
-#include "../src/http/json.hpp"
+#include <orbit/server/App.hpp>
+#include <orbit/config/Config.hpp>
+#include <orbit/database/PostgresClient.hpp>
+#include <orbit/database/PostgresCoro.hpp>
+#include <orbit/concurrency/Task.hpp>
+#include <orbit/middleware/Validation.hpp>
+#include <orbit/http/json.hpp>
 #include <iostream>
 #include <memory>
 #include <string>

@@ -1,5 +1,5 @@
-#include "StaticFiles.hpp"
-#include "../utils/Logger.hpp"
+#include <orbit/middleware/StaticFiles.hpp>
+#include <orbit/utils/Logger.hpp>
 #include <filesystem>
 
 namespace middleware {

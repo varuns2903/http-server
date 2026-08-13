@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest]
 
     steps:
     - uses: actions/checkout@v3
@@ -86,10 +86,6 @@ jobs:
       run: |
         brew install cmake openssl libpq hiredis pkg-config nghttp2 libngtcp2 libnghttp3 zlib mariadb-connector-c mongo-c-driver
 
-    - name: Install Dependencies (Windows)
-      if: matrix.os == 'windows-latest'
-      run: |
-        vcpkg install pkgconf nghttp2 ngtcp2[openssl] nghttp3 openssl libpq zlib libmariadb mongo-c-driver --triplet x64-windows
 
     - name: Configure CMake (Ubuntu)
       if: matrix.os == 'ubuntu-latest'
@@ -111,11 +107,6 @@ jobs:
           -DCMAKE_PREFIX_PATH="$(brew --prefix openssl);$(brew --prefix libpq);$(brew --prefix libngtcp2);$(brew --prefix libnghttp3);$(brew --prefix nghttp2);$(brew --prefix hiredis);$(brew --prefix zlib);$(brew --prefix mariadb-connector-c);$(brew --prefix mongo-c-driver)" \
           ..
 
-    - name: Configure CMake (Windows)
-      if: matrix.os == 'windows-latest'
-      run: |
-        mkdir -p build && cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake ..
 
     - name: Build Framework
       run: |

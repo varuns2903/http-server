@@ -1,6 +1,6 @@
-#include "RedisClient.hpp"
-#include "../utils/Logger.hpp"
-#include "../network/PlatformSocket.hpp"
+#include <orbit/database/RedisClient.hpp>
+#include <orbit/utils/Logger.hpp>
+#include <orbit/network/PlatformSocket.hpp>
 #include <sstream>
 
 namespace database {

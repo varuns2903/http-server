@@ -1,15 +1,15 @@
-#include "EventLoop.hpp"
-#include "../utils/Logger.hpp"
+#include <orbit/server/EventLoop.hpp>
+#include <orbit/utils/Logger.hpp>
 #if defined(__APPLE__) || defined(__FreeBSD__)
-#include "../network/KqueueProactor.hpp"
+#include <orbit/network/KqueueProactor.hpp>
 #elif defined(_WIN32)
-#include "../network/IocpProactor.hpp"
+#include <orbit/network/IocpProactor.hpp>
 #else
-#include "../network/EpollProactor.hpp"
-#include "../network/IoUringProactor.hpp"
+#include <orbit/network/EpollProactor.hpp>
+#include <orbit/network/IoUringProactor.hpp>
 #endif
 #include <iostream>
-#include "../network/PlatformSocket.hpp"
+#include <orbit/network/PlatformSocket.hpp>
 #include <thread>
 #include <chrono>
 

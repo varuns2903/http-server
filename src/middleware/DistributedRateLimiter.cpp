@@ -1,5 +1,5 @@
-#include "DistributedRateLimiter.hpp"
-#include "../http/HttpResponse.hpp"
+#include <orbit/middleware/DistributedRateLimiter.hpp>
+#include <orbit/http/HttpResponse.hpp>
 
 namespace middleware {
 

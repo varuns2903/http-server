@@ -1,6 +1,6 @@
-#include "WebSocketConnection.hpp"
-#include "../server/Connection.hpp"
-#include "../network/PlatformSocket.hpp"
+#include <orbit/http/WebSocketConnection.hpp>
+#include <orbit/server/Connection.hpp>
+#include <orbit/network/PlatformSocket.hpp>
 #include <cstring>
 #include <iostream>
 

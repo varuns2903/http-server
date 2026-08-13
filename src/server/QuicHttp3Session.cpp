@@ -1,8 +1,8 @@
-#include "QuicHttp3Session.hpp"
-#include "../http/HttpResponse.hpp"
+#include <orbit/server/QuicHttp3Session.hpp>
+#include <orbit/http/HttpResponse.hpp>
 
-#include "QuicConnection.hpp"
-#include "../routing/Router.hpp"
+#include <orbit/server/QuicConnection.hpp>
+#include <orbit/routing/Router.hpp>
 #include <iostream>
 
 #ifdef _WIN32

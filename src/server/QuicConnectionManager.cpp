@@ -1,6 +1,6 @@
-#include "QuicConnectionManager.hpp"
-#include "QuicConnection.hpp"
-#include "../utils/PrometheusRegistry.hpp"
+#include <orbit/server/QuicConnectionManager.hpp>
+#include <orbit/server/QuicConnection.hpp>
+#include <orbit/utils/PrometheusRegistry.hpp>
 #include <iostream>
 #include <cstring>
 

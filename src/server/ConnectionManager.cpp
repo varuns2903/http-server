@@ -1,5 +1,5 @@
-#include "ConnectionManager.hpp"
-#include "../utils/PrometheusRegistry.hpp"
+#include <orbit/server/ConnectionManager.hpp>
+#include <orbit/utils/PrometheusRegistry.hpp>
 #include <iostream>
 
 namespace server {

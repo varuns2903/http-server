@@ -1,5 +1,5 @@
 #if defined(__APPLE__) || defined(__FreeBSD__)
-#include "KqueueProactor.hpp"
+#include <orbit/network/KqueueProactor.hpp>
 #include <unistd.h>
 #include <fcntl.h>
 #include <iostream>

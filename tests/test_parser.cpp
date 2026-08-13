@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "../src/http/HttpParser.hpp"
+#include <orbit/http/HttpParser.hpp>
 
 using namespace http;
 

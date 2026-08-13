@@ -1,8 +1,8 @@
-#include "App.hpp"
-#include "../utils/Logger.hpp"
-#include "../utils/PrometheusRegistry.hpp"
-#include "../network/ConnectionPool.hpp"
-#include "../network/PlatformSocket.hpp"
+#include <orbit/server/App.hpp>
+#include <orbit/utils/Logger.hpp>
+#include <orbit/utils/PrometheusRegistry.hpp>
+#include <orbit/network/ConnectionPool.hpp>
+#include <orbit/network/PlatformSocket.hpp>
 #include <csignal>
 #include <cstring>
 #ifndef _WIN32

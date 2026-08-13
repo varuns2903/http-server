@@ -1,5 +1,5 @@
-#include "TlsContext.hpp"
-#include "../utils/Logger.hpp"
+#include <orbit/network/TlsContext.hpp>
+#include <orbit/utils/Logger.hpp>
 #include <cstring>
 
 namespace network {

@@ -1,4 +1,4 @@
-#include "Cors.hpp"
+#include <orbit/middleware/Cors.hpp>
 #include <sstream>
 
 namespace middleware {

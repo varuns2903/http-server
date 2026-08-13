@@ -1,8 +1,8 @@
-#include "UdpSocket.hpp"
+#include <orbit/network/UdpSocket.hpp>
 #include <stdexcept>
 #include <cerrno>
 #include <cstring>
-#include "PlatformSocket.hpp"
+#include <orbit/network/PlatformSocket.hpp>
 
 namespace network {
 

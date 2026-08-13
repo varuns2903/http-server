@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "http/WebSocket.hpp"
+#include <orbit/http/WebSocket.hpp>
 
 class WebSocketTest : public ::testing::Test {
 protected:

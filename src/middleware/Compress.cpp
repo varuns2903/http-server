@@ -1,4 +1,4 @@
-#include "Compress.hpp"
+#include <orbit/middleware/Compress.hpp>
 #include <zlib.h>
 #include <cstring>
 #include <iostream>
