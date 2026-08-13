@@ -23,18 +23,44 @@ struct Http3Stream {
     Http3Stream(int64_t id) : stream_id(id) {}
 };
 
+/**
+ * @brief Manages an HTTP/3 session over a QUIC connection.
+ */
 class QuicHttp3Session {
 public:
+    /**
+     * @brief Constructs a QuicHttp3Session.
+     * @param quic_conn The underlying QUIC connection.
+     */
     explicit QuicHttp3Session(QuicConnection& quic_conn);
     ~QuicHttp3Session();
 
+    /**
+     * @brief Initializes the HTTP/3 session.
+     * @return true on success, false otherwise.
+     */
     bool init();
     
-    // Called when QUIC stream data is received
+    /**
+     * @brief Gets the underlying nghttp3 connection.
+     * @return Pointer to nghttp3_conn.
+     */
     nghttp3_conn* get_conn() const { return httpconn_; }
+    
+    /**
+     * @brief Processes received QUIC stream data for HTTP/3.
+     * @param stream_id The QUIC stream ID.
+     * @param data The stream data.
+     * @param datalen The length of the data.
+     * @param fin Whether this is the final data for the stream.
+     * @return 0 on success, or a negative error code.
+     */
     int process_stream_data(int64_t stream_id, const uint8_t* data, size_t datalen, bool fin);
     
-    // Called to serialize HTTP/3 frames and feed them to ngtcp2
+    /**
+     * @brief Serializes HTTP/3 frames and feeds them to ngtcp2.
+     * @return 0 on success, or a negative error code.
+     */
     int write_streams();
 
 private:

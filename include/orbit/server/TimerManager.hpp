@@ -23,17 +23,40 @@ struct TimerEvent {
     }
 };
 
+/**
+ * @brief Manages timers for connection timeouts.
+ */
 class TimerManager {
 public:
+    /**
+     * @brief Constructs a TimerManager.
+     */
     TimerManager();
 
+    /**
+     * @brief Adds a timer for a given file descriptor.
+     * @param fd The file descriptor.
+     * @param timeout The timeout duration.
+     * @return The timer ID.
+     */
     uint64_t add_timer(int fd, std::chrono::milliseconds timeout);
+    
+    /**
+     * @brief Cancels a timer by ID.
+     * @param timer_id The timer ID.
+     */
     void cancel_timer(uint64_t timer_id);
 
-    // Returns how many milliseconds until the next timer expires, or -1 if empty
+    /**
+     * @brief Gets the time remaining until the next timeout.
+     * @return Milliseconds until the next timeout, or -1 if none.
+     */
     int get_next_timeout();
 
-    // Process all expired timers
+    /**
+     * @brief Processes all expired timers.
+     * @param on_timeout Callback invoked for each expired timer with its file descriptor.
+     */
     void handle_expired_timers(std::function<void(int)> on_timeout);
 
 private:

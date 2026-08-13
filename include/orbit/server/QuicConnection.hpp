@@ -23,13 +23,39 @@ namespace server {
 class QuicConnectionManager;
 class QuicHttp3Session;
 
+/**
+ * @brief Represents a single QUIC connection.
+ */
 class QuicConnection {
 public:
+    /**
+     * @brief Constructs a QuicConnection.
+     * @param manager The QUIC connection manager.
+     * @param client_dcid Client destination connection ID.
+     * @param client_scid Client source connection ID.
+     * @param server_scid Server source connection ID.
+     * @param remote_addr The remote address.
+     * @param ssl_ctx The SSL context.
+     */
     QuicConnection(QuicConnectionManager& manager, const ngtcp2_cid& client_dcid, const ngtcp2_cid& client_scid, const ngtcp2_cid& server_scid, const sockaddr_in& remote_addr, SSL_CTX* ssl_ctx);
     ~QuicConnection();
 
+    /**
+     * @brief Processes an incoming QUIC packet.
+     * @param data The packet data.
+     * @param datalen The length of the data.
+     * @param remote_addr The remote address.
+     */
     void process_packet(const uint8_t* data, size_t datalen, const sockaddr_in& remote_addr);
+    
+    /**
+     * @brief Handles connection expiry.
+     */
     void handle_expiry();
+    
+    /**
+     * @brief Sends any pending data for the connection.
+     */
     void send_pending_data();
 
 private:

@@ -24,11 +24,22 @@ struct DynamicRoute {
     RouteHandler handler;
 };
 
+/**
+ * @brief Manages routing of HTTP requests to their appropriate handlers.
+ */
 class Router {
 public:
+    /**
+     * @brief Constructs a new Router.
+     * @param prefix The route prefix for this router.
+     * @param parent Pointer to the parent router, if any.
+     */
     Router(const std::string& prefix = "", Router* parent = nullptr) 
         : prefix_(prefix), parent_(parent) {}
 
+    /**
+     * @brief A builder class for fluent route configuration.
+     */
     class RouteBuilder {
     public:
         RouteBuilder(Router& router, http::HttpMethod method, const std::string& path, std::vector<Middleware> mws = {})
@@ -49,11 +60,28 @@ public:
         openapi::RouteMetadata meta_;
     };
 
+    /**
+     * @brief Initiates a route builder for a specific path and method.
+     * @param path The URL path.
+     * @param method The HTTP method (default is GET).
+     * @return A RouteBuilder instance to configure the route.
+     * 
+     * @code
+     * router.route("/users", HttpMethod::POST)
+     *       .summary("Create a user")
+     *       .handler([](auto& req, auto res) { ... });
+     * @endcode
+     */
     RouteBuilder route(const std::string& path, http::HttpMethod method = http::HttpMethod::GET) {
         return RouteBuilder(*this, method, path);
     }
 
     // Route Grouping
+    /**
+     * @brief Creates a route group with a specific prefix.
+     * @param prefix The URL prefix for the group.
+     * @param callback A function to configure routes within the group.
+     */
     void group(const std::string& prefix, std::function<void(Router&)> callback);
 
     // Register a handler for a specific HTTP method and path
