@@ -237,7 +237,6 @@ FetchContent_MakeAvailable(googletest)
 enable_testing()
 
 add_executable(http_server_tests 
-    tests/test_dummy.cpp
     tests/test_parser.cpp
     tests/test_router.cpp
     tests/test_threadpool.cpp
