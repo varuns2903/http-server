@@ -76,17 +76,17 @@ std::shared_ptr<Http3Stream> QuicHttp3Session::get_or_create_stream(int64_t stre
     return stream;
 }
 
-int QuicHttp3Session::on_acked_stream_data(nghttp3_conn *conn, int64_t stream_id, uint64_t datalen, void *conn_user_data, void *stream_user_data) {
+int QuicHttp3Session::on_acked_stream_data(nghttp3_conn * /*conn*/, int64_t /*stream_id*/, uint64_t /*datalen*/, void * /*conn_user_data*/, void * /*stream_user_data*/) {
     return 0;
 }
 
-int QuicHttp3Session::on_stream_close(nghttp3_conn *conn, int64_t stream_id, uint64_t app_error_code, void *conn_user_data, void *stream_user_data) {
+int QuicHttp3Session::on_stream_close(nghttp3_conn * /*conn*/, int64_t stream_id, uint64_t /*app_error_code*/, void *conn_user_data, void * /*stream_user_data*/) {
     auto session = static_cast<QuicHttp3Session*>(conn_user_data);
     session->streams_.erase(stream_id);
     return 0;
 }
 
-int QuicHttp3Session::on_recv_data(nghttp3_conn *conn, int64_t stream_id, const uint8_t *data, size_t datalen, void *conn_user_data, void *stream_user_data) {
+int QuicHttp3Session::on_recv_data(nghttp3_conn * /*conn*/, int64_t stream_id, const uint8_t *data, size_t datalen, void *conn_user_data, void * /*stream_user_data*/) {
     std::cout << "H3: on_recv_data stream=" << stream_id << " len=" << datalen << "\n";
     auto session = static_cast<QuicHttp3Session*>(conn_user_data);
     auto stream = session->get_or_create_stream(stream_id);

@@ -108,7 +108,7 @@ int main(int argc, char* argv[]) {
                 writer->send(std::move(res));
             } catch (const std::exception& e) {
                 http::HttpResponse res;
-                res.status(http::HttpStatus::INTERNAL_SERVER_ERROR);
+                res.status(http::HttpStatus::InternalServerError);
                 res.body = e.what();
                 writer->send(std::move(res));
             }

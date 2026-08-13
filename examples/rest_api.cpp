@@ -16,7 +16,7 @@ using namespace database;
 using namespace concurrency;
 
 // C++20 Coroutine Handler Example
-Task coro_db_handler(HttpRequest& req, std::shared_ptr<ResponseWriter> writer, std::shared_ptr<PostgresClient> pg_client) {
+Task coro_db_handler(HttpRequest& /*req*/, std::shared_ptr<ResponseWriter> writer, std::shared_ptr<PostgresClient> pg_client) {
     // 1. Await database connection natively without blocking threads!
     bool connected = co_await connect_async(pg_client);
     if (!connected) {
@@ -50,7 +50,7 @@ int main() {
     App app(config);
 
     // FEATURE 1: Global Error Handling Middleware
-    app.on_error([](const std::exception& e, HttpRequest& req, std::shared_ptr<ResponseWriter> writer) {
+    app.on_error([](const std::exception& e, HttpRequest& /*req*/, std::shared_ptr<ResponseWriter> writer) {
         std::cerr << "[Global Error Handler] Caught exception: " << e.what() << "\n";
         HttpResponse res;
         nlohmann::json err;
@@ -82,7 +82,7 @@ int main() {
     });
 
     // Throw route to test global error handler
-    app.get("/crash", [](HttpRequest& req, std::shared_ptr<ResponseWriter> writer) {
+    app.get("/crash", [](HttpRequest& /*req*/, std::shared_ptr<ResponseWriter> /*writer*/) {
         throw std::runtime_error("Simulated catastrophic failure in route handler!");
     });
 
